@@ -1,0 +1,8 @@
+﻿SEQNO,LineID,LineName,LineColor,IsBranch,LineGroup,UpdateTime
+1,'BR',"'{'文湖線','Wenhu Line'}'",'#b57a25',0,'BR',20160824
+2,'R',"'{'淡水信義線','Tamsui-Xinyi Line'}'",'#d90023',0,'R',20160824
+3,'G',"'{'松山新店線','Songshan-Xindian Line'}'",'#107547',0,'G',20160824
+4,'O',"'{'中和新蘆線','Zhonghe-Xinlu Line'}'",'#f5a818',0,'O',20160824
+5,'BL',"'{'板南線','Bannan Line'}'",'#0a59ae',0,'BL',20160824
+6,'R-3',"'{'新北投支線','Xinbeitou Branch Line'}'",'#ef9298',1,'R',20160824
+7,'G-3',"'{'小碧潭支線','Xiaobitan branch line'}'",'#d2de1a',1,'G',20160824
