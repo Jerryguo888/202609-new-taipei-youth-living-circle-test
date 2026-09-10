@@ -7,6 +7,7 @@
   <title>青年生活圈｜新北公共資源決策平台</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 
@@ -1721,6 +1722,8 @@
   <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <!-- map-config.local.js is gitignored; see map-config.example.js for the template -->
+  <script src="map-config.local.js"></script>
   <script>
     /* ===== [改版保留：官方公車資料與演算法核心開始] ===== */
     const DATA_FILES = {
@@ -1799,6 +1802,11 @@
     let stopLayerEventsBound = false;
     let population3dMap = null;
     let population3dLoading = false;
+    let networkLoadPromise = null;
+    let transitReachCache = null;
+    let transitReachCachePromise = null;
+    let districtStationTotals = null;
+    let popByYearRef = {};
     let appVm = null;
 
     function parseCSV(text) {
@@ -2371,6 +2379,98 @@
       return MODEL.transferMinutes;
     }
 
+    /* [本次新增：抽出公車／捷運資料讀取與建圖，供 2D 選站頁與 3D 人口地圖共用] */
+    function loadNetworkCore() {
+      if (networkLoadPromise) return networkLoadPromise;
+      networkLoadPromise = (async function () {
+        const responses = await Promise.all([
+          fetch(DATA_FILES.stops),
+          fetch(DATA_FILES.routes),
+          fetch(DATA_FILES.districts),
+          fetch(DATA_FILES.metroStations),
+          fetch(DATA_FILES.metroRouteStations),
+          fetch(DATA_FILES.metroLines),
+          fetch(DATA_FILES.metroTravelTimes),
+          fetch(DATA_FILES.metroTransferWalk),
+          fetch(DATA_FILES.metroHeadways),
+          fetch(DATA_FILES.ntmcMetroStations),
+          fetch(DATA_FILES.ntmcMetroRouteStations),
+          fetch(DATA_FILES.ntmcMetroLines),
+          fetch(DATA_FILES.ntmcMetroHeadways)
+        ]);
+        if (responses.some(function (response) { return !response.ok; })) throw new Error("CSV 讀取失敗");
+        const texts = await Promise.all(responses.map(function (response) { return response.text(); }));
+        buildNetwork(parseCSV(texts[0]), parseCSV(texts[1]), parseCSV(texts[2]));
+        buildMetroLayersData(
+          parseCSV(texts[3]), parseCSV(texts[4]), parseCSV(texts[5]),
+          parseCSV(texts[6]), parseCSV(texts[7]), parseCSV(texts[8]),
+          parseCSV(texts[9]), parseCSV(texts[10]), parseCSV(texts[11]), parseCSV(texts[12])
+        );
+      })().catch(function (error) {
+        networkLoadPromise = null;
+        throw error;
+      });
+      return networkLoadPromise;
+    }
+
+    /* [本次新增：每個交通節點 30 分鐘可達站數 ÷ 該行政區站數 × 該行政區青年人口，
+       批次計算避免單一畫面凍結，計算一次後快取供年份切換重複使用] */
+    function ensureTransitReachCache(onProgress) {
+      if (transitReachCache) return Promise.resolve(transitReachCache);
+      if (transitReachCachePromise) return transitReachCachePromise;
+      transitReachCachePromise = new Promise(function (resolve) {
+        const cache = new Map();
+        const totals = new Map();
+        transitNodes.forEach(function (node) {
+          totals.set(node.district, (totals.get(node.district) || 0) + 1);
+        });
+        const ids = Array.from(transitNodes.keys());
+        let index = 0;
+        function step() {
+          const chunkEnd = Math.min(index + 250, ids.length);
+          for (; index < chunkEnd; index++) {
+            const id = ids[index];
+            cache.set(id, computeReachability(id, 30).reached.length);
+          }
+          if (onProgress) onProgress(index, ids.length);
+          if (index < ids.length) {
+            setTimeout(step, 0);
+          } else {
+            transitReachCache = cache;
+            districtStationTotals = totals;
+            resolve(cache);
+          }
+        }
+        step();
+      });
+      return transitReachCachePromise;
+    }
+
+    /* [本次新增：把每個交通節點的 30 分鐘可達站數平均到行政區層級，
+       再套用「可達站數 ÷ 區內站數 × 區內青年人口」算出每個行政區單一分數，
+       供 3D 人口地圖疊加為第三段柱狀（不再逐站繪製）] */
+    function buildDistrictTransitScores(year) {
+      const youthByDistrict = new Map();
+      (popByYearRef[year] || []).forEach(function (row) {
+        youthByDistrict.set(row.area, row.a1 + row.a2);
+      });
+      const reachSumByDistrict = new Map();
+      transitNodes.forEach(function (node) {
+        const reach = transitReachCache.get(node.id);
+        if (reach === undefined) return;
+        reachSumByDistrict.set(node.district, (reachSumByDistrict.get(node.district) || 0) + reach);
+      });
+      const scores = new Map();
+      reachSumByDistrict.forEach(function (reachSum, district) {
+        const totalStations = districtStationTotals.get(district);
+        if (!totalStations) return;
+        const avgReach = reachSum / totalStations;
+        const youthPop = youthByDistrict.get(district) || 0;
+        scores.set(district, (avgReach / totalStations) * youthPop);
+      });
+      return scores;
+    }
+
     function computeReachability(startId, maxMinutes) {
       const heap = new MinHeap();
       const distances = new Map();
@@ -2926,11 +3026,12 @@
           });
         });
 
+        popByYearRef = popByYear;
         const years = Object.keys(popByYear).sort(function (a, b) { return Number(a) - Number(b); });
         if (!years.length) throw new Error("CSV 交叉比對後沒有可顯示資料");
 
-        const ageGroups = ["20~29歲", "30~34歲"];
-        const colors = ["#4e79a7", "#e15759"];
+        const ageGroups = ["20~29歲", "30~34歲", "交通可及性"];
+        const colors = ["#4e79a7", "#e15759", "#f2a93c"];
         const selectedAges = new Set(ageGroups);
         let maxTotal = 0;
         years.forEach(function (year) {
@@ -2939,37 +3040,64 @@
         const scale = 5000 / maxTotal;
         const half = .004;
         let currentYear = years[0];
+        /* [本次新增：交通可及性分數換算高度用的獨立比例尺，等交通資料算完才會有值；
+           算好前這根柱子不會出現，算好後會重新繪製] */
+        let transitScale = 0;
+        let transitScoresByYear = null;
+        /* [本次改版：交通可及性是「比率 × 人口」的複合分數，跟人口柱的「人數」單位不同，
+           改成畫在人口柱右側的獨立柱子，不再疊加，避免總高度混合兩種不同單位] */
+        const transitHalf = half;
+        const transitOffsetLon = half + transitHalf + .0015;
+
+        function squareRing(lon, lat, sizeHalf) {
+          return [[
+            [lon - sizeHalf, lat - sizeHalf],
+            [lon + sizeHalf, lat - sizeHalf],
+            [lon + sizeHalf, lat + sizeHalf],
+            [lon - sizeHalf, lat + sizeHalf],
+            [lon - sizeHalf, lat - sizeHalf]
+          ]];
+        }
 
         function buildBarFeatures(year) {
           const features = [];
+          const transitScores = transitScoresByYear ? transitScoresByYear.get(year) : null;
           popByYear[year].forEach(function (row) {
-            let cumulative = 0;
-            [[ageGroups[0], row.a1], [ageGroups[1], row.a2]].forEach(function (entry, index) {
-              if (!selectedAges.has(entry[0])) return;
-              const base = cumulative * scale;
-              cumulative += entry[1];
+            let heightSoFar = 0;
+            [[ageGroups[0], row.a1, row.a1 * scale], [ageGroups[1], row.a2, row.a2 * scale]].forEach(function (entry, index) {
+              const label = entry[0], rawValue = entry[1], height = entry[2];
+              if (!selectedAges.has(label)) return;
+              const base = heightSoFar;
+              heightSoFar += height;
               features.push({
                 type: "Feature",
                 properties: {
                   district: row.area,
-                  age: entry[0],
-                  value: entry[1],
+                  age: label,
+                  value: rawValue,
                   base: base,
-                  top: cumulative * scale,
+                  top: heightSoFar,
                   color: colors[index]
                 },
-                geometry: {
-                  type: "Polygon",
-                  coordinates: [[
-                    [row.lon - half, row.lat - half],
-                    [row.lon + half, row.lat - half],
-                    [row.lon + half, row.lat + half],
-                    [row.lon - half, row.lat + half],
-                    [row.lon - half, row.lat - half]
-                  ]]
-                }
+                geometry: { type: "Polygon", coordinates: squareRing(row.lon, row.lat, half) }
               });
             });
+
+            if (transitScores && selectedAges.has(ageGroups[2])) {
+              const rawScore = transitScores.get(row.area) || 0;
+              features.push({
+                type: "Feature",
+                properties: {
+                  district: row.area,
+                  age: ageGroups[2],
+                  value: Math.round(rawScore),
+                  base: 0,
+                  top: rawScore * transitScale,
+                  color: colors[2]
+                },
+                geometry: { type: "Polygon", coordinates: squareRing(row.lon + transitOffsetLon, row.lat, transitHalf) }
+              });
+            }
           });
           return { type: "FeatureCollection", features: features };
         }
@@ -2989,27 +3117,30 @@
 
         const bounds = new maplibregl.LngLatBounds();
         popByYear[currentYear].forEach(function (row) { bounds.extend([row.lon, row.lat]); });
+        const cartoKeyParam = window.CARTO_MAP_API_KEY
+          ? "?key=" + encodeURIComponent(window.CARTO_MAP_API_KEY)
+          : "";
         population3dMap = new maplibregl.Map({
           container: "population-3d-map",
           style: {
             version: 8,
             glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
             sources: {
-              "osm-darkened": {
+              "carto-dark": {
                 type: "raster",
-                tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                tiles: [
+                  "https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png" + cartoKeyParam
+                ],
                 tileSize: 256,
-                attribution: "&copy; OpenStreetMap contributors"
+                attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
               }
             },
             layers: [{
-              id: "osm-dark-layer",
+              id: "carto-dark-layer",
               type: "raster",
-              source: "osm-darkened",
+              source: "carto-dark",
               paint: {
-                "raster-brightness-max": .38,
-                "raster-saturation": -.55,
-                "raster-contrast": .18
+                "raster-brightness-max": .85
               }
             }]
           },
@@ -3068,6 +3199,32 @@
           });
           population3dMap.setPitch(55);
           population3dMap.setBearing(-10);
+
+          /* [本次新增：每站 30 分鐘可達站數 ÷ 行政區站數 × 行政區青年人口，
+             平均到行政區後疊加為柱狀圖第三段，直接堆在 20~29 歲、30~34 歲上面] */
+          loadNetworkCore().then(function () {
+            status.hidden = false;
+            status.classList.remove("error");
+            status.textContent = "計算交通節點可及性中…";
+            return ensureTransitReachCache(function (done, total) {
+              status.textContent = "計算交通節點可及性中…" + done.toLocaleString() + " / " + total.toLocaleString();
+            });
+          }).then(function () {
+            transitScoresByYear = new Map();
+            years.forEach(function (year) { transitScoresByYear.set(year, buildDistrictTransitScores(year)); });
+            let maxTransitScore = 0;
+            transitScoresByYear.forEach(function (scores) {
+              scores.forEach(function (score) { maxTransitScore = Math.max(maxTransitScore, score); });
+            });
+            transitScale = maxTransitScore > 0 ? 5000 / maxTransitScore : 0;
+            status.hidden = true;
+            setYear(currentYear);
+          }).catch(function (error) {
+            console.error(error);
+            status.hidden = false;
+            status.classList.add("error");
+            status.textContent = "交通節點可及性計算失敗：" + error.message + "。請確認以本機伺服器開啟網站。";
+          });
         });
 
         const slider = document.getElementById("population-3d-year-slider");
@@ -3082,8 +3239,9 @@
           tooltip.style.display = "block";
           tooltip.style.left = event.point.x + 12 + "px";
           tooltip.style.top = event.point.y + 12 + "px";
+          const unit = feature.properties.age === "交通可及性" ? "（加權分數）" : " 人";
           tooltip.innerHTML = "<b>" + feature.properties.district + "</b>（" + currentYear + " 年）<br>" +
-            feature.properties.age + "：" + Number(feature.properties.value).toLocaleString() + " 人";
+            feature.properties.age + "：" + Number(feature.properties.value).toLocaleString() + unit;
         });
         population3dMap.on("mouseleave", "pop-bars-layer", function () {
           population3dMap.getCanvas().style.cursor = "";
@@ -3235,31 +3393,7 @@
           this.transitLoading = true;
           this.transitStatus = "讀取新北官方資料…";
           try {
-            const responses = await Promise.all([
-              fetch(DATA_FILES.stops),
-              fetch(DATA_FILES.routes),
-              fetch(DATA_FILES.districts),
-              fetch(DATA_FILES.metroStations),
-              fetch(DATA_FILES.metroRouteStations),
-              fetch(DATA_FILES.metroLines),
-              fetch(DATA_FILES.metroTravelTimes),
-              fetch(DATA_FILES.metroTransferWalk),
-              fetch(DATA_FILES.metroHeadways),
-              fetch(DATA_FILES.ntmcMetroStations),
-              fetch(DATA_FILES.ntmcMetroRouteStations),
-              fetch(DATA_FILES.ntmcMetroLines),
-              fetch(DATA_FILES.ntmcMetroHeadways)
-            ]);
-            if (responses.some(function (response) { return !response.ok; })) throw new Error("CSV 讀取失敗");
-            const texts = await Promise.all(responses.map(function (response) { return response.text(); }));
-            this.transitStatus = "建立交通節點圖…";
-            await new Promise(function (resolve) { setTimeout(resolve, 20); });
-            buildNetwork(parseCSV(texts[0]), parseCSV(texts[1]), parseCSV(texts[2]));
-            buildMetroLayersData(
-              parseCSV(texts[3]), parseCSV(texts[4]), parseCSV(texts[5]),
-              parseCSV(texts[6]), parseCSV(texts[7]), parseCSV(texts[8]),
-              parseCSV(texts[9]), parseCSV(texts[10]), parseCSV(texts[11]), parseCSV(texts[12])
-            );
+            await loadNetworkCore();
             this.stationGroups = createStationGroups();
             this.metroGroups = createMetroGroups();
             if (!this.metroGroups.some(function (group) { return group.id === this.activeMetroLine; }, this) && this.metroGroups[0]) {
