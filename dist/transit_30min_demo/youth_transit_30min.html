@@ -622,21 +622,21 @@
     /* ===== [改版保留：30 分鐘交通工具樣式開始] ===== */
     .transit-layout {
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
+      grid-template-columns: 390px minmax(0, 1fr);
       min-height: calc(100vh - 110px);
       overflow: hidden;
       border: 1px solid var(--line);
-      border-radius: var(--radius-xl);
+      border-radius: 18px;
       background: white;
-      box-shadow: var(--shadow);
+      box-shadow: 0 14px 40px rgba(23,55,47,.1);
     }
 
     .transit-sidebar {
       z-index: 650;
       overflow-y: auto;
-      padding: 25px;
+      padding: 24px;
       border-right: 1px solid var(--line);
-      background: #f9faf7;
+      background: #fbfcfb;
     }
 
     .transit-sidebar h1 {
@@ -647,6 +647,35 @@
     }
 
     .transit-sidebar > p { color: var(--ink-soft); font-size: .85rem; line-height: 1.65; }
+
+    /* ===== [本次改版新增：公車／捷運起點切換，採一般交通工具介面] ===== */
+    .transit-mode-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 18px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #eef2ef;
+    }
+
+    .transit-mode-button {
+      min-height: 38px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: .82rem;
+      font-weight: 800;
+    }
+
+    .transit-mode-button.active {
+      border-color: #c8d6d0;
+      background: white;
+      color: var(--forest);
+      box-shadow: 0 3px 10px rgba(23,55,47,.08);
+    }
 
     .control-block {
       margin-top: 22px;
@@ -733,6 +762,9 @@
 
     .district-tab small { color: inherit; font-size: .62rem; opacity: .7; }
     .district-tab:hover, .district-tab.active { border-color: var(--forest-2); background: var(--forest); color: white; }
+    .district-tab.metro-tab { border-bottom: 3px solid var(--line-color, #0a59ae); }
+    .district-tab.metro-tab.active { border-color: var(--line-color, #0a59ae); background: var(--line-color, #0a59ae); }
+    .district-tab.metro-tab i { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,.75); }
     .control-pair {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -781,6 +813,13 @@
     }
 
     .action-button:disabled { cursor: wait; opacity: .45; }
+
+    .transit-model-note {
+      margin: 10px 0 0;
+      color: var(--ink-soft);
+      font-size: .72rem;
+      line-height: 1.55;
+    }
 
     .metric-grid {
       display: grid;
@@ -836,6 +875,7 @@
 
     .selected-route-card strong { display: block; color: var(--forest); font-size: .88rem; }
     .selected-route-card span { display: block; margin-top: 4px; color: var(--ink-soft); font-size: .7rem; line-height: 1.5; }
+    .selected-route-card.metro { border-left: 4px solid var(--route-color, #0a59ae); }
     .route-clear { margin-top: 7px; padding: 0; background: transparent; color: var(--forest-2); font-size: .68rem; font-weight: 760; }
 
     .map-wrap { position: relative; min-width: 0; min-height: 720px; background: #d9e4e7; }
@@ -1025,6 +1065,7 @@
     .population-3d-status.error { color: #ffb4b4; }
 
     .leaflet-container { font: inherit; }
+    .leaflet-container .leaflet-interactive { cursor: pointer; }
     .leaflet-popup-content-wrapper, .leaflet-popup-tip { color: var(--ink); background: white; }
     .leaflet-popup-content strong { color: var(--forest); }
     .route-flow { animation: route-flow 1.1s linear infinite; }
@@ -1465,25 +1506,32 @@
       <section class="view module" v-show="activeView === 'transit'">
         <div class="transit-layout">
           <aside class="transit-sidebar">
-            <p class="section-kicker">30-Minute Access</p>
-            <h1>交通節點可達分析</h1>
-            <p>選一個站位，查看時間內可抵達的節點、路線與職涯服務範圍。</p>
+            <p class="section-kicker">交通分析</p>
+            <h1>30 分鐘交通圈</h1>
+            <p>選擇公車或捷運站，查看 30 分鐘內可到達的站點與路線。</p>
 
             <div class="control-block">
+              <!-- [本次改版新增：公車／捷運共用選站流程] -->
+              <div class="transit-mode-tabs" role="tablist" aria-label="交通工具">
+                <button class="transit-mode-button" :class="{ active: stopMode === 'bus' }"
+                        @click="selectStopMode('bus')">公車站</button>
+                <button class="transit-mode-button" :class="{ active: stopMode === 'metro' }"
+                        @click="selectStopMode('metro')">捷運站</button>
+              </div>
               <label class="control-label" for="stop-search">出發交通節點</label>
               <div class="search-holder">
                 <input id="stop-search" class="field" type="search" autocomplete="off"
                        v-model="stopQuery" @input="findStops" @focus="findStops"
-                       placeholder="輸入站名，例如：板橋車站">
+                       :placeholder="searchPlaceholder">
                 <div class="suggestions" v-if="stopSuggestions.length">
                   <button class="suggestion" v-for="stop in stopSuggestions" :key="stop.id"
                           @click="chooseStop(stop.id)">
-                    {{ stop.name }}<small>{{ stop.routeCount }} 條路線經過</small>
+                    {{ stop.name }}<small>{{ stop.kindLabel }}・{{ stop.routeCount }} 條路線</small>
                   </button>
                 </div>
               </div>
               <!-- [本次新增：行政區橫向籤＋單區站位選單，避免 8,746 站一路拉到底] -->
-              <div class="station-picker">
+              <div class="station-picker" v-if="stopMode === 'bus'">
                 <label class="control-label" for="station-select">依行政區瀏覽站位</label>
                 <div class="district-tabs" role="tablist" aria-label="行政區">
                   <button v-for="group in stationGroups" :key="group.name" class="district-tab"
@@ -1501,6 +1549,28 @@
                 </select>
               </div>
 
+              <!-- [本次改版新增：捷運依路線橫向瀏覽，站點可直接作為起點] -->
+              <div class="station-picker" v-else>
+                <label class="control-label" for="metro-station-select">依路線瀏覽捷運站</label>
+                <div class="district-tabs" role="tablist" aria-label="捷運路線">
+                  <button v-for="group in metroGroups" :key="group.id" class="district-tab metro-tab"
+                          :class="{ active: activeMetroLine === group.id }"
+                          :style="{ '--line-color': group.color }"
+                          @click="selectMetroLine(group.id)">
+                    <i :style="{ background: group.color }"></i>{{ group.name }}<small>{{ group.stops.length }}</small>
+                  </button>
+                </div>
+                <select id="metro-station-select" v-model="selectedStartId" @change="chooseStop(selectedStartId, true)"
+                        :disabled="!transitLoaded">
+                  <option :value="null" disabled>請選擇捷運站</option>
+                  <option v-for="stop in activeMetroStops" :key="stop.id" :value="stop.id">
+                    {{ stop.name }}（{{ stop.lineNames }}）
+                  </option>
+                </select>
+              </div>
+
+              <p class="transit-model-note">包含平均候車、站間行駛、停靠、步行轉乘與轉乘候車時間。</p>
+
               <div class="control-pair">
                 <label><span class="control-label">出發時間</span><input type="time" v-model="departureTime"></label>
                 <label><span class="control-label">動畫速度</span>
@@ -1515,7 +1585,7 @@
               <input type="range" min="10" max="60" step="5" v-model.number="minuteLimit">
 
               <button class="action-button" :disabled="transitLoading || !selectedStartId" @click="runReachability">
-                開始動畫
+                計算 30 分鐘範圍
               </button>
             </div>
 
@@ -1542,6 +1612,21 @@
                   <button class="route-clear" @click="clearBusRoute">清除單一路線圖</button>
                 </div>
               </div>
+
+              <!-- [本次改版新增：可達捷運路線清單，操作方式與公車一致] -->
+              <div class="result-routes" v-if="resultMetroLines.length">
+                <span class="control-label">可搭捷運・點選查看路線圖</span>
+                <div class="result-route-list">
+                  <button v-for="line in resultMetroLines" :key="line.id" class="result-route-chip"
+                          :class="{ active: selectedMetroLineId === line.id }"
+                          @click="focusMetroLine(line.id)">{{ line.name }}</button>
+                </div>
+                <div class="selected-route-card metro" v-if="selectedMetroLineInfo">
+                  <strong>{{ selectedMetroLineInfo.name }}</strong>
+                  <span>本頁資料含 {{ selectedMetroLineInfo.stationCount }} 個站點</span>
+                  <button class="route-clear" @click="clearMetroLine">清除單一路線圖</button>
+                </div>
+              </div>
             </div>
           </aside>
 
@@ -1550,11 +1635,11 @@
             <div class="map-clock"><small>模擬經過時間</small><strong>{{ animationClock }}</strong></div>
             <div class="map-data-badge">{{ transitStatus }}</div>
             <div class="map-legend">
-              <div><i style="background:#70847e"></i>站位聚合／單站</div>
+              <div><i style="background:#70847e"></i>公車站（點擊選站）</div>
               <div><i style="background:#2fae9c"></i>較快可達</div>
               <div><i style="background:#f2c94c"></i>接近上限</div>
               <div><i style="background:#e16755"></i>出發節點</div>
-              <div><i style="background:#0a59ae"></i>捷運站點與路線</div>
+              <div><i style="background:#0a59ae"></i>捷運站／路線（點擊選站）</div>
             </div>
             <div class="map-loading" v-if="transitLoading">
               <div class="loader">
@@ -1645,6 +1730,15 @@
       metroStations: "data/raw/taipei_metro_stations.csv",
       metroRouteStations: "data/raw/taipei_metro_route_stations.csv",
       metroLines: "data/raw/taipei_metro_lines.csv",
+      /* [本次改版新增：官方捷運站間秒數、轉乘步行與班距] */
+      metroTravelTimes: "data/raw/taipei_metro_travel_times.csv",
+      metroTransferWalk: "data/raw/taipei_metro_transfer_walk.csv",
+      metroHeadways: "data/raw/taipei_metro_headways.csv",
+      /* [本次改版新增：TDX 新北環狀線站點、站序、路線與班距] */
+      ntmcMetroStations: "data/raw/ntmc_metro_stations.csv",
+      ntmcMetroRouteStations: "data/raw/ntmc_metro_route_stations.csv",
+      ntmcMetroLines: "data/raw/ntmc_metro_lines.csv",
+      ntmcMetroHeadways: "data/raw/ntmc_metro_headways.csv",
       /* [本次整合：唯讀使用組員既有的 29 區座標檔，不修改來源] */
       districts: "../3d_map/新北市行政區經緯度.csv"
     };
@@ -1656,7 +1750,14 @@
       transferMinutes: 2,
       defaultPeakHeadway: 12,
       defaultOffPeakHeadway: 18,
-      maxWaitingMinutes: 10
+      maxWaitingMinutes: 10,
+      walkSpeedKmh: 4.5,
+      stationEntryMinutes: 1.5,
+      maxBusMetroWalkKm: .45,
+      maxBusLinksPerMetro: 8,
+      defaultMetroPeakHeadway: 6,
+      defaultMetroOffPeakHeadway: 9,
+      maxMetroWaitingMinutes: 7
     };
 
     /* ===== [AWS AI Bot 串接位置 1／2：服務開關與 API 網址] =====
@@ -1676,6 +1777,10 @@
     let transitRouteGroups = new Map();
     let metroStations = [];
     let metroRoutes = [];
+    let searchableMetroNodes = [];
+    let metroLineMeta = new Map();
+    let metroHeadwaySchedules = new Map();
+    let metroTransferMinutes = new Map();
     let searchableNodes = [];
     let districtCenters = [];
     let leafletMap = null;
@@ -1685,6 +1790,7 @@
     let reachableLayer = null;
     let routeLayer = null;
     let selectedBusRouteLayer = null;
+    let selectedMetroLineLayer = null;
     let metroLineLayer = null;
     let metroStationLayer = null;
     let hullLayer = null;
@@ -1837,6 +1943,7 @@
             lat: lat,
             lon: lon,
             routes: new Set(),
+            mode: "bus",
             district: "",
             districtEstimated: false
           });
@@ -1886,6 +1993,7 @@
             from: current.nodeId,
             to: next.nodeId,
             routeId: current.routeId,
+            mode: "bus",
             routeName: meta.namezh || meta.pathattributename || current.routeId,
             travelMinutes: travelMinutes,
             peakHeadway: parseHeadway(meta.peakheadway, MODEL.defaultPeakHeadway),
@@ -1899,7 +2007,7 @@
       });
     }
 
-    /* ===== [本次新增：官方捷運 CSV 解析，只建立地圖點線，不納入分鐘估算] ===== */
+    /* ===== [本次改版新增：官方捷運 CSV 解析並納入 30 分鐘交通圖] ===== */
     function cleanOfficialField(value) {
       return String(value || "")
         .replace(/^'\{/, "")
@@ -1909,7 +2017,7 @@
     }
 
     function localizedName(value) {
-      return cleanOfficialField(value).split(",")[0].trim();
+      return cleanOfficialField(value).split(",")[0].replace(/^'+|'+$/g, "").trim();
     }
 
     function parseMetroStationSequence(value) {
@@ -1922,15 +2030,39 @@
       return result.sort(function (a, b) { return a.sequence - b.sequence; });
     }
 
-    function buildMetroLayersData(stationRows, routeStationRows, lineRows) {
-      const stationByAlias = new Map();
-      const physicalStations = [];
-      const lineMeta = new Map();
+    function normalizeMetroStationName(value) {
+      return localizedName(value)
+        .replace(/^捷運/, "")
+        .replace(/站$/, "")
+        .replace(/台/g, "臺")
+        .replace(/[／/]/g, "-")
+        .replace(/[\s　]/g, "")
+        .trim();
+    }
 
-      lineRows.forEach(function (row) {
+    function minutesOfDay(value) {
+      const parts = String(value || "00:00").split(":").map(Number);
+      return (Number.isFinite(parts[0]) ? parts[0] : 0) * 60 + (Number.isFinite(parts[1]) ? parts[1] : 0);
+    }
+
+    function addGraphEdge(fromId, edge) {
+      if (!transitGraph.has(fromId)) transitGraph.set(fromId, []);
+      transitGraph.get(fromId).push(edge);
+    }
+
+    function buildMetroLayersData(stationRows, routeStationRows, lineRows, travelRows, transferRows, headwayRows,
+                                  ntmcStationRows, ntmcRouteRows, ntmcLineRows, ntmcHeadwayRows) {
+      const stationByAlias = new Map();
+      const stationByName = new Map();
+      const physicalStations = [];
+      metroLineMeta = new Map();
+      metroHeadwaySchedules = new Map();
+      metroTransferMinutes = new Map();
+
+      lineRows.concat(ntmcLineRows).forEach(function (row) {
         const id = cleanOfficialField(row.LineID || row.lineid);
         if (!id) return;
-        lineMeta.set(id, {
+        metroLineMeta.set(id, {
           id: id,
           name: localizedName(row.LineName || row.linename) || id,
           color: cleanOfficialField(row.LineColor || row.linecolor) || "#287b50"
@@ -1949,10 +2081,39 @@
           name: localizedName(row.StationName || row.stationname) || aliases[0],
           lat: lat,
           lon: lon,
-          lines: new Set(aliases.map(function (alias) { return alias.replace(/\d.*$/, ""); }))
+          lines: new Set(aliases.map(function (alias) { return alias.replace(/\d.*$/, ""); })),
+          district: districtFromAddress(row.StationAddress || row.stationaddress) || nearestDistrict(lat, lon)
         };
         physicalStations.push(station);
+        stationByName.set(normalizeMetroStationName(station.name), station);
         aliases.forEach(function (alias) { stationByAlias.set(alias, station); });
+      });
+
+      /* TDX 補上新北環狀線；與臺北捷運同名站合併成同一轉乘節點。 */
+      ntmcStationRows.forEach(function (row) {
+        const alias = cleanOfficialField(row.StationID || row.stationid);
+        const name = localizedName(row.StationName || row.stationname) || alias;
+        const lat = Number(row.Latitude || row.latitude);
+        const lon = Number(row.Longitude || row.longitude);
+        if (!alias || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        const key = normalizeMetroStationName(name);
+        let station = stationByName.get(key);
+        if (!station) {
+          station = {
+            id: alias,
+            aliases: [],
+            name: name,
+            lat: lat,
+            lon: lon,
+            lines: new Set(),
+            district: cleanOfficialField(row.District || row.district) || districtFromAddress(row.Address || row.address) || nearestDistrict(lat, lon)
+          };
+          physicalStations.push(station);
+          stationByName.set(key, station);
+        }
+        if (!station.aliases.includes(alias)) station.aliases.push(alias);
+        station.lines.add(alias.replace(/\d.*$/, ""));
+        stationByAlias.set(alias, station);
       });
 
       const routes = [];
@@ -1963,7 +2124,7 @@
         const sequence = parseMetroStationSequence(row.Stations || row.stations);
         const stations = sequence.map(function (item) { return stationByAlias.get(item.id); }).filter(Boolean);
         if (!routeId || stations.length < 2) return;
-        const meta = lineMeta.get(routeId) || lineMeta.get(lineId) || {};
+        const meta = metroLineMeta.get(lineId) || metroLineMeta.get(routeId) || {};
         routes.push({
           id: routeId,
           lineId: lineId,
@@ -1973,8 +2134,155 @@
         });
       });
 
+      const ntmcByLine = new Map();
+      ntmcRouteRows.forEach(function (row) {
+        const lineId = cleanOfficialField(row.LineID || row.lineid);
+        const station = stationByAlias.get(cleanOfficialField(row.StationID || row.stationid));
+        if (!lineId || !station) return;
+        if (!ntmcByLine.has(lineId)) ntmcByLine.set(lineId, []);
+        ntmcByLine.get(lineId).push({ station: station, sequence: Number(row.Sequence || row.sequence) || 0 });
+      });
+      ntmcByLine.forEach(function (items, lineId) {
+        items.sort(function (a, b) { return a.sequence - b.sequence; });
+        const meta = metroLineMeta.get(lineId) || {};
+        routes.push({
+          id: lineId + "-NTMC",
+          lineId: lineId,
+          name: meta.name || lineId,
+          color: meta.color || "#fedb00",
+          stations: items.map(function (item) { return item.station; })
+        });
+      });
+
+      headwayRows.forEach(function (row) {
+        const lineId = cleanOfficialField(row.LineID || row.lineid);
+        if (!lineId || !String(row.ServiceDays || row.servicedays).includes("平日")) return;
+        const schedules = [];
+        const expression = /'(\d{2}:\d{2})','(\d{2}:\d{2})',(\d+),(\d+)/g;
+        let match;
+        while ((match = expression.exec(String(row.Headways || row.headways || ""))) !== null) {
+          schedules.push({
+            start: minutesOfDay(match[1]),
+            end: minutesOfDay(match[2]) || 1440,
+            headway: (Number(match[3]) + Number(match[4])) / 2
+          });
+        }
+        if (schedules.length) metroHeadwaySchedules.set(lineId, schedules);
+      });
+      ntmcHeadwayRows.forEach(function (row) {
+        if (cleanOfficialField(row.ServiceType || row.servicetype) !== "平日") return;
+        const lineId = cleanOfficialField(row.LineID || row.lineid);
+        if (!lineId) return;
+        if (!metroHeadwaySchedules.has(lineId)) metroHeadwaySchedules.set(lineId, []);
+        metroHeadwaySchedules.get(lineId).push({
+          start: minutesOfDay(row.StartTime || row.starttime),
+          end: minutesOfDay(row.EndTime || row.endtime) || 1440,
+          headway: (Number(row.MinHeadwayMins || row.minheadwaymins) + Number(row.MaxHeadwayMins || row.maxheadwaymins)) / 2
+        });
+      });
+
+      transferRows.forEach(function (row) {
+        const name = normalizeMetroStationName(row.station || row.Station);
+        const minutes = Number(row.Time || row.time);
+        if (name && Number.isFinite(minutes)) metroTransferMinutes.set(name, minutes);
+      });
+
+      physicalStations.forEach(function (station) {
+        const nodeId = "metro:" + normalizeMetroStationName(station.name);
+        station.nodeId = nodeId;
+        const node = {
+          id: nodeId,
+          name: station.name,
+          lat: station.lat,
+          lon: station.lon,
+          routes: new Set(Array.from(station.lines).map(function (lineId) { return "MRT:" + lineId; })),
+          lines: new Set(station.lines),
+          mode: "metro",
+          district: station.district || nearestDistrict(station.lat, station.lon),
+          districtEstimated: false
+        };
+        transitNodes.set(nodeId, node);
+        transitGraph.set(nodeId, []);
+      });
+
+      /* 官方站間行駛與停靠秒數，建立雙向捷運邊。 */
+      const seenMetroEdges = new Set();
+      travelRows.forEach(function (row) {
+        const fromStation = stationByName.get(normalizeMetroStationName(row.stationA || row.StationA));
+        const toStation = stationByName.get(normalizeMetroStationName(row.stationB || row.StationB));
+        if (!fromStation || !toStation || fromStation.nodeId === toStation.nodeId) return;
+        const commonLines = Array.from(fromStation.lines).filter(function (lineId) { return toStation.lines.has(lineId); });
+        const lineId = commonLines[0] || Array.from(fromStation.lines)[0] || "MRT";
+        const travelMinutes = Math.max(.5, (Number(row.traveltime || row.TravelTime) + Number(row.stoptime || row.StopTime || 0)) / 60);
+        [[fromStation, toStation], [toStation, fromStation]].forEach(function (pair) {
+          const key = pair[0].nodeId + "|" + pair[1].nodeId + "|" + lineId;
+          if (seenMetroEdges.has(key)) return;
+          seenMetroEdges.add(key);
+          addGraphEdge(pair[0].nodeId, {
+            from: pair[0].nodeId,
+            to: pair[1].nodeId,
+            routeId: "MRT:" + lineId,
+            lineId: lineId,
+            routeName: (metroLineMeta.get(lineId) || {}).name || lineId,
+            mode: "metro",
+            travelMinutes: travelMinutes
+          });
+        });
+      });
+
+      /* 捷運出入口與附近公車站以步行邊相連，轉乘才可跨運具計算。 */
+      const busNodes = searchableNodes.slice();
+      physicalStations.forEach(function (station) {
+        const nearby = busNodes.map(function (bus) {
+          return { node: bus, distanceKm: haversineKm(station.lat, station.lon, bus.lat, bus.lon) };
+        }).filter(function (item) {
+          return item.distanceKm <= MODEL.maxBusMetroWalkKm;
+        }).sort(function (a, b) {
+          return a.distanceKm - b.distanceKm;
+        }).slice(0, MODEL.maxBusLinksPerMetro);
+        nearby.forEach(function (item) {
+          const minutes = Math.max(1.5, item.distanceKm / MODEL.walkSpeedKmh * 60 + MODEL.stationEntryMinutes);
+          addGraphEdge(station.nodeId, {
+            from: station.nodeId, to: item.node.id, routeId: null, mode: "walk", travelMinutes: minutes
+          });
+          addGraphEdge(item.node.id, {
+            from: item.node.id, to: station.nodeId, routeId: null, mode: "walk", travelMinutes: minutes
+          });
+        });
+      });
+
       metroStations = physicalStations;
       metroRoutes = routes;
+      searchableMetroNodes = physicalStations.map(function (station) { return transitNodes.get(station.nodeId); }).filter(Boolean).sort(function (a, b) {
+        return a.name.localeCompare(b.name, "zh-Hant");
+      });
+    }
+
+    function createMetroGroups() {
+      const preferredOrder = ["BR", "R", "G", "O", "BL", "Y"];
+      const byLine = new Map();
+      metroRoutes.forEach(function (route) {
+        if (!byLine.has(route.lineId)) {
+          byLine.set(route.lineId, { id: route.lineId, name: route.name, color: route.color, stops: [] });
+        }
+        const group = byLine.get(route.lineId);
+        route.stations.forEach(function (station) {
+          if (!group.stops.some(function (stop) { return stop.id === station.nodeId; })) {
+            const node = transitNodes.get(station.nodeId);
+            if (node) group.stops.push({
+              id: node.id,
+              name: node.name,
+              routeCount: node.routes.size,
+              lineNames: Array.from(node.lines).map(function (id) { return (metroLineMeta.get(id) || {}).name || id; }).join("、")
+            });
+          }
+        });
+      });
+      return Array.from(byLine.values()).sort(function (a, b) {
+        const ai = preferredOrder.indexOf(a.id);
+        const bi = preferredOrder.indexOf(b.id);
+        return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || a.name.localeCompare(b.name, "zh-Hant");
+      });
     }
 
     function normalizeStopName(name) {
@@ -1990,6 +2298,7 @@
     function originBoardingSeeds(startId) {
       const start = transitNodes.get(startId);
       if (!start) return [];
+      if (start.mode === "metro") return [{ nodeId: start.id, time: 0 }];
       const normalized = normalizeStopName(start.name);
       const seeds = [{ nodeId: start.id, time: 0 }];
       searchableNodes.forEach(function (node) {
@@ -2036,11 +2345,30 @@
       get size() { return this.items.length; }
     }
 
-    function edgeWait(edge) {
+    function edgeWait(edge, elapsedMinutes) {
       const hour = Number((appVm.departureTime || "08:00").split(":")[0]);
       const peak = (hour >= 7 && hour < 10) || (hour >= 17 && hour < 20);
+      if (edge.mode === "walk") return 0;
+      if (edge.mode === "metro") {
+        const time = (minutesOfDay(appVm.departureTime || "08:00") + Number(elapsedMinutes || 0)) % 1440;
+        const schedules = metroHeadwaySchedules.get(edge.lineId) || [];
+        const active = schedules.find(function (item) {
+          return time >= item.start && time < item.end;
+        });
+        const fallback = peak ? MODEL.defaultMetroPeakHeadway : MODEL.defaultMetroOffPeakHeadway;
+        const headway = active ? active.headway : fallback;
+        return Math.min(MODEL.maxMetroWaitingMinutes, Math.max(.75, headway / 2));
+      }
       const headway = peak ? edge.peakHeadway : edge.offPeakHeadway;
       return Math.min(MODEL.maxWaitingMinutes, Math.max(1, headway / 2));
+    }
+
+    function transferCost(nodeId, previousMode, nextMode) {
+      if (previousMode === "metro" && nextMode === "metro") {
+        const node = transitNodes.get(nodeId);
+        return metroTransferMinutes.get(normalizeMetroStationName(node ? node.name : "")) || MODEL.transferMinutes;
+      }
+      return MODEL.transferMinutes;
     }
 
     function computeReachability(startId, maxMinutes) {
@@ -2052,8 +2380,8 @@
       seeds.forEach(function (seed) {
         const stateKey = seed.nodeId + "|@start";
         distances.set(stateKey, seed.time);
-        bestByNode.set(seed.nodeId, { nodeId: seed.nodeId, time: seed.time, stateKey: stateKey, routeId: null });
-        heap.push({ nodeId: seed.nodeId, routeId: "@start", stateKey: stateKey, cost: seed.time });
+        bestByNode.set(seed.nodeId, { nodeId: seed.nodeId, time: seed.time, stateKey: stateKey, routeId: null, mode: "start" });
+        heap.push({ nodeId: seed.nodeId, routeId: "@start", mode: "start", stateKey: stateKey, cost: seed.time });
       });
 
       while (heap.size) {
@@ -2061,23 +2389,28 @@
         if (!state || state.cost !== distances.get(state.stateKey) || state.cost > maxMinutes) continue;
         const edges = transitGraph.get(state.nodeId) || [];
         edges.forEach(function (edge) {
-          const changesRoute = state.routeId !== edge.routeId;
-          const wait = changesRoute ? edgeWait(edge) : 0;
-          const transfer = changesRoute && state.routeId !== "@start" ? MODEL.transferMinutes : 0;
+          const isWalking = edge.mode === "walk";
+          const nextRouteId = isWalking ? "@walk" : edge.routeId;
+          const changesRoute = !isWalking && state.routeId !== edge.routeId;
+          const wait = changesRoute ? edgeWait(edge, state.cost) : 0;
+          const transfer = changesRoute && state.routeId !== "@start" && state.routeId !== "@walk"
+            ? transferCost(state.nodeId, state.mode, edge.mode)
+            : 0;
           const nextCost = state.cost + wait + transfer + edge.travelMinutes;
           if (nextCost > maxMinutes) return;
-          const nextKey = edge.to + "|" + edge.routeId;
+          const nextKey = edge.to + "|" + nextRouteId;
           if (nextCost + 1e-9 >= (distances.get(nextKey) ?? Infinity)) return;
           distances.set(nextKey, nextCost);
           predecessor.set(nextKey, { previous: state.stateKey, edge: edge });
-          heap.push({ nodeId: edge.to, routeId: edge.routeId, stateKey: nextKey, cost: nextCost });
+          heap.push({ nodeId: edge.to, routeId: nextRouteId, mode: edge.mode, stateKey: nextKey, cost: nextCost });
           const currentBest = bestByNode.get(edge.to);
           if (!currentBest || nextCost < currentBest.time) {
             bestByNode.set(edge.to, {
               nodeId: edge.to,
               time: nextCost,
               stateKey: nextKey,
-              routeId: edge.routeId
+              routeId: edge.routeId,
+              mode: edge.mode
             });
           }
         });
@@ -2085,8 +2418,13 @@
 
       const reached = Array.from(bestByNode.values()).sort(function (a, b) { return a.time - b.time; });
       const routeIds = new Set();
+      const busRouteIds = new Set();
+      const metroLineIds = new Set();
       predecessor.forEach(function (step) {
-        if (step.edge && step.edge.routeId) routeIds.add(step.edge.routeId);
+        if (!step.edge || !step.edge.routeId) return;
+        routeIds.add(step.edge.routeId);
+        if (step.edge.mode === "bus") busRouteIds.add(step.edge.routeId);
+        if (step.edge.mode === "metro" && step.edge.lineId) metroLineIds.add(step.edge.lineId);
       });
       const start = transitNodes.get(startId);
       let farthestKm = 0;
@@ -2099,6 +2437,8 @@
         maxMinutes: maxMinutes,
         reached: reached,
         routeIds: routeIds,
+        busRouteIds: busRouteIds,
+        metroLineIds: metroLineIds,
         farthestKm: farthestKm,
         predecessor: predecessor
       };
@@ -2111,7 +2451,7 @@
         setTimeout(function () { leafletMap.invalidateSize(); }, 0);
         return;
       }
-      canvasRenderer = L.canvas({ padding: .4, tolerance: 6 });
+      canvasRenderer = L.canvas({ padding: .4, tolerance: 12 });
       svgRenderer = L.svg({ padding: .4 });
       leafletMap = L.map("transit-map", {
         center: [25.012, 121.47],
@@ -2127,19 +2467,24 @@
         maxZoom: 20,
         attribution: "&copy; OpenStreetMap contributors"
       }).addTo(leafletMap);
-      leafletMap.createPane("metroLinesPane").style.zIndex = 410;
+      leafletMap.createPane("coveragePane").style.zIndex = 430;
+      leafletMap.createPane("metroLinesPane").style.zIndex = 520;
+      leafletMap.createPane("busStopsPane").style.zIndex = 600;
       leafletMap.createPane("metroStationsPane").style.zIndex = 620;
+      leafletMap.createPane("resultPane").style.zIndex = 640;
+      leafletMap.createPane("originPane").style.zIndex = 650;
       metroLineLayer = L.layerGroup().addTo(leafletMap);
       metroStationLayer = L.layerGroup().addTo(leafletMap);
       baseStopsLayer = L.layerGroup().addTo(leafletMap);
       reachableLayer = L.layerGroup().addTo(leafletMap);
       routeLayer = L.layerGroup().addTo(leafletMap);
       selectedBusRouteLayer = L.layerGroup().addTo(leafletMap);
+      selectedMetroLineLayer = L.layerGroup().addTo(leafletMap);
       hullLayer = L.layerGroup().addTo(leafletMap);
       originLayer = L.layerGroup().addTo(leafletMap);
     }
 
-    /* [本次新增：捷運只顯示官方站點與路線；不套用公車分鐘色階] */
+    /* [本次改版：捷運站可點選為起點，點位放大並置於公車站上層] */
     function renderMetroReference() {
       if (!leafletMap || !metroLineLayer || !metroStationLayer) return;
       metroLineLayer.clearLayers();
@@ -2161,14 +2506,17 @@
           const route = metroRoutes.find(function (item) { return item.lineId === lineId; });
           return route ? route.color : "#287b50";
         });
-        L.circleMarker([station.lat, station.lon], {
+        const marker = L.circleMarker([station.lat, station.lon], {
           pane: "metroStationsPane",
-          radius: station.lines.size > 1 ? 7 : 5.5,
+          radius: station.lines.size > 1 ? 9.5 : 8,
           color: "#ffffff",
-          weight: 2,
+          weight: 2.5,
           fillColor: colors[0] || "#287b50",
           fillOpacity: 1
-        }).bindTooltip("捷運・" + station.name, { direction: "top", opacity: .96 }).addTo(metroStationLayer);
+        });
+        marker.bindTooltip("捷運・" + station.name + "（點擊設為起點）", { direction: "top", opacity: .96 });
+        marker.on("click", function () { appVm.chooseStop(station.nodeId, true); });
+        marker.addTo(metroStationLayer);
       });
     }
 
@@ -2183,18 +2531,18 @@
         return bounds.contains([node.lat, node.lon]);
       });
 
-      if (zoom >= 14) {
+      if (zoom >= 13) {
         visibleNodes.forEach(function (node) {
           const marker = L.circleMarker([node.lat, node.lon], {
-            renderer: canvasRenderer,
-            radius: 5,
+            pane: "busStopsPane",
+            radius: 6.5,
             color: "#ffffff",
-            weight: 1.1,
+            weight: 1.4,
             fillColor: "#516d65",
-            fillOpacity: .86
+            fillOpacity: .94
           });
           marker.on("click", function () { appVm.chooseStop(node.id, true); });
-          marker.bindTooltip(node.name + "・" + node.district, { direction: "top", opacity: .94 });
+          marker.bindTooltip(node.name + "・" + node.district + "（點擊設為起點）", { direction: "top", opacity: .94 });
           marker.addTo(baseStopsLayer);
         });
         return;
@@ -2217,7 +2565,7 @@
         const lat = bucket.lat / count;
         const lon = bucket.lon / count;
         const marker = L.circleMarker([lat, lon], {
-          renderer: canvasRenderer,
+          pane: "busStopsPane",
           radius: Math.min(21, 7 + Math.sqrt(count) * 1.35),
           color: "#ffffff",
           weight: 1.5,
@@ -2229,7 +2577,7 @@
           marker.on("click", function () { appVm.chooseStop(bucket.nodes[0].id, true); });
         } else {
           marker.bindTooltip(count.toLocaleString() + " 個站位・點擊放大", { direction: "top", opacity: .94 });
-          marker.on("click", function () { leafletMap.flyTo([lat, lon], Math.min(14, zoom + 2), { duration: .55 }); });
+          marker.on("click", function () { leafletMap.flyTo([lat, lon], Math.min(14, zoom + 3), { duration: .55 }); });
         }
         marker.addTo(baseStopsLayer);
       });
@@ -2244,7 +2592,7 @@
     function drawOrigin(node) {
       originLayer.clearLayers();
       L.circleMarker([node.lat, node.lon], {
-        renderer: svgRenderer,
+        pane: "originPane",
         radius: 17,
         color: "#e16755",
         weight: 2.5,
@@ -2253,7 +2601,7 @@
         className: "origin-pulse"
       }).addTo(originLayer);
       L.circleMarker([node.lat, node.lon], {
-        renderer: svgRenderer,
+        pane: "originPane",
         radius: 7,
         color: "#ffffff",
         weight: 2,
@@ -2268,10 +2616,13 @@
       if (reachableLayer) reachableLayer.clearLayers();
       if (routeLayer) routeLayer.clearLayers();
       if (selectedBusRouteLayer) selectedBusRouteLayer.clearLayers();
+      if (selectedMetroLineLayer) selectedMetroLineLayer.clearLayers();
       if (hullLayer) hullLayer.clearLayers();
       if (appVm) {
         appVm.selectedRouteId = null;
         appVm.selectedRouteInfo = null;
+        appVm.selectedMetroLineId = null;
+        appVm.selectedMetroLineInfo = null;
       }
       appVm.animationClock = "00:00";
     }
@@ -2307,6 +2658,7 @@
       const hull = convexHull(points);
       if (hull.length >= 3) {
         L.polygon(hull, {
+          pane: "coveragePane",
           color: "#2fae9c",
           weight: 1.5,
           opacity: .7,
@@ -2316,7 +2668,7 @@
         }).addTo(hullLayer);
       }
 
-      const segments = [];
+      const segments = { bus: [], metro: [], walk: [] };
       const seen = new Set();
       result.reached.slice(1, 700).forEach(function (item) {
         const step = result.predecessor.get(item.stateKey);
@@ -2326,19 +2678,20 @@
         const key = step.edge.from + "|" + step.edge.to + "|" + step.edge.routeId;
         if (!a || !b || seen.has(key)) return;
         seen.add(key);
-        segments.push([[a.lat, a.lon], [b.lat, b.lon]]);
+        segments[step.edge.mode || "bus"].push([[a.lat, a.lon], [b.lat, b.lon]]);
       });
-      if (segments.length) {
-        L.polyline(segments, {
-          renderer: svgRenderer,
-          color: "#18572f",
-          weight: 2,
-          opacity: .56,
-          dashArray: "7 8",
-          className: "route-flow",
-          interactive: false
-        }).addTo(routeLayer);
-      }
+      if (segments.bus.length) L.polyline(segments.bus, {
+        renderer: svgRenderer, color: "#18572f", weight: 2, opacity: .56,
+        dashArray: "7 8", className: "route-flow", interactive: false
+      }).addTo(routeLayer);
+      if (segments.metro.length) L.polyline(segments.metro, {
+        renderer: svgRenderer, color: "#0a59ae", weight: 3.5, opacity: .72,
+        className: "route-flow", interactive: false
+      }).addTo(routeLayer);
+      if (segments.walk.length) L.polyline(segments.walk, {
+        renderer: svgRenderer, color: "#72817d", weight: 1.5, opacity: .55,
+        dashArray: "2 7", interactive: false
+      }).addTo(routeLayer);
 
       /* [本次修正：視窗以起點對稱置中，避免可達圖看起來只偏向單側]
          真正可達範圍仍依公車站序，不用假圓形覆蓋取代交通網路。 */
@@ -2372,17 +2725,18 @@
       const color = ratio < .58 ? "#2fae9c" : ratio < .84 ? "#f2c94c" : "#e98067";
       const directKm = haversineKm(start.lat, start.lon, node.lat, node.lon);
       L.circleMarker([node.lat, node.lon], {
-        renderer: canvasRenderer,
-        radius: item.time > result.maxMinutes * .8 ? 6.5 : 5.5,
-        color: "#ffffff",
-        weight: 1.2,
+        pane: "resultPane",
+        radius: node.mode === "metro" ? 8.5 : (item.time > result.maxMinutes * .8 ? 6.5 : 5.5),
+        color: node.mode === "metro" ? "#0a59ae" : "#ffffff",
+        weight: node.mode === "metro" ? 2.2 : 1.2,
         fillColor: color,
         fillOpacity: .95
       }).bindPopup(
         "<strong>" + escapeHTML(node.name) + "</strong><br>" +
         "預估抵達：" + item.time.toFixed(1) + " 分鐘<br>" +
         "直線距離：" + directKm.toFixed(2) + " 公里<br>" +
-        "抵達路線：" + escapeHTML(item.routeId || "起點")
+        "節點類型：" + (node.mode === "metro" ? "捷運站" : "公車站") + "<br>" +
+        "抵達路線：" + escapeHTML(item.routeId ? item.routeId.replace(/^MRT:/, "捷運 ") : "步行／起點")
       ).addTo(reachableLayer);
     }
 
@@ -2400,6 +2754,23 @@
     function listReachableBusRoutes(routeIds) {
       return Array.from(routeIds).map(busRouteSummary).sort(function (a, b) {
         return a.name.localeCompare(b.name, "zh-Hant", { numeric: true });
+      });
+    }
+
+    function metroLineSummary(lineId) {
+      const meta = metroLineMeta.get(lineId) || {};
+      const stations = metroStations.filter(function (station) { return station.lines.has(lineId); });
+      return {
+        id: lineId,
+        name: meta.name || lineId,
+        color: meta.color || "#0a59ae",
+        stationCount: stations.length
+      };
+    }
+
+    function listReachableMetroLines(lineIds) {
+      return Array.from(lineIds).map(metroLineSummary).sort(function (a, b) {
+        return a.name.localeCompare(b.name, "zh-Hant");
       });
     }
 
@@ -2425,6 +2796,40 @@
       });
       if (bounds.length > 1) leafletMap.fitBounds(bounds, { padding: [42, 42], maxZoom: 14, animate: true });
       return busRouteSummary(routeId);
+    }
+
+    /* [本次改版新增：捷運路線選取與公車相同，可單獨檢視全線] */
+    function drawSelectedMetroLine(lineId) {
+      if (!selectedMetroLineLayer) return null;
+      selectedMetroLineLayer.clearLayers();
+      const bounds = [];
+      const summary = metroLineSummary(lineId);
+      metroRoutes.filter(function (route) { return route.lineId === lineId; }).forEach(function (route) {
+        const points = route.stations.map(function (station) { return [station.lat, station.lon]; });
+        if (points.length < 2) return;
+        points.forEach(function (point) { bounds.push(point); });
+        L.polyline(points, {
+          pane: "metroLinesPane",
+          color: summary.color,
+          weight: 8,
+          opacity: .96
+        }).bindTooltip("捷運・" + summary.name, { sticky: true }).addTo(selectedMetroLineLayer);
+      });
+      if (bounds.length > 1) leafletMap.fitBounds(bounds, { padding: [42, 42], maxZoom: 14, animate: true });
+      return summary;
+    }
+
+    function focusNodeCollection(stops, maxZoom) {
+      if (!leafletMap || !stops || !stops.length) return;
+      const points = stops.map(function (stop) {
+        const node = transitNodes.get(stop.id);
+        return node ? [node.lat, node.lon] : null;
+      }).filter(Boolean);
+      if (points.length === 1) {
+        leafletMap.flyTo(points[0], maxZoom || 14, { duration: .55 });
+      } else if (points.length > 1) {
+        leafletMap.fitBounds(points, { padding: [38, 38], maxZoom: maxZoom || 14, animate: true, duration: .55 });
+      }
     }
 
     function animateResult(result) {
@@ -2753,10 +3158,13 @@
           transitLoaded: false,
           transitLoading: false,
           transitStatus: "官方資料待載入",
+          stopMode: "bus",
           stopQuery: "",
           stopSuggestions: [],
           stationGroups: [],
           activeDistrict: "板橋區",
+          metroGroups: [],
+          activeMetroLine: "BL",
           selectedStartId: null,
           departureTime: "08:00",
           animationSpeed: 2,
@@ -2766,6 +3174,9 @@
           resultRoutes: [],
           selectedRouteId: null,
           selectedRouteInfo: null,
+          resultMetroLines: [],
+          selectedMetroLineId: null,
+          selectedMetroLineInfo: null,
           chatOpen: false,
           chatInput: "",
           chatChips: ["哪裡最適合設點？", "30 分鐘怎麼算？", "幫我看預算方案"],
@@ -2778,6 +3189,13 @@
         activeDistrictStops: function () {
           const group = this.stationGroups.find(function (item) { return item.name === this.activeDistrict; }, this);
           return group ? group.stops : [];
+        },
+        activeMetroStops: function () {
+          const group = this.metroGroups.find(function (item) { return item.id === this.activeMetroLine; }, this);
+          return group ? group.stops : [];
+        },
+        searchPlaceholder: function () {
+          return this.stopMode === "metro" ? "輸入捷運站名，例如：板橋" : "輸入公車站名，例如：板橋車站";
         },
         forecastRows: function () {
           return [
@@ -2823,22 +3241,37 @@
               fetch(DATA_FILES.districts),
               fetch(DATA_FILES.metroStations),
               fetch(DATA_FILES.metroRouteStations),
-              fetch(DATA_FILES.metroLines)
+              fetch(DATA_FILES.metroLines),
+              fetch(DATA_FILES.metroTravelTimes),
+              fetch(DATA_FILES.metroTransferWalk),
+              fetch(DATA_FILES.metroHeadways),
+              fetch(DATA_FILES.ntmcMetroStations),
+              fetch(DATA_FILES.ntmcMetroRouteStations),
+              fetch(DATA_FILES.ntmcMetroLines),
+              fetch(DATA_FILES.ntmcMetroHeadways)
             ]);
             if (responses.some(function (response) { return !response.ok; })) throw new Error("CSV 讀取失敗");
             const texts = await Promise.all(responses.map(function (response) { return response.text(); }));
             this.transitStatus = "建立交通節點圖…";
             await new Promise(function (resolve) { setTimeout(resolve, 20); });
             buildNetwork(parseCSV(texts[0]), parseCSV(texts[1]), parseCSV(texts[2]));
-            buildMetroLayersData(parseCSV(texts[3]), parseCSV(texts[4]), parseCSV(texts[5]));
+            buildMetroLayersData(
+              parseCSV(texts[3]), parseCSV(texts[4]), parseCSV(texts[5]),
+              parseCSV(texts[6]), parseCSV(texts[7]), parseCSV(texts[8]),
+              parseCSV(texts[9]), parseCSV(texts[10]), parseCSV(texts[11]), parseCSV(texts[12])
+            );
             this.stationGroups = createStationGroups();
+            this.metroGroups = createMetroGroups();
+            if (!this.metroGroups.some(function (group) { return group.id === this.activeMetroLine; }, this) && this.metroGroups[0]) {
+              this.activeMetroLine = this.metroGroups[0].id;
+            }
             bindStopLayerEvents();
             renderMetroReference();
             renderBaseStops();
             const defaultNode = nearestNode(25.0142, 121.4639).node;
             if (defaultNode) this.chooseStop(defaultNode.id, false);
             this.transitLoaded = true;
-            this.transitStatus = "官方公車 " + transitNodes.size.toLocaleString() + " 站・捷運 " + metroStations.length + " 站";
+            this.transitStatus = "公車 " + searchableNodes.length.toLocaleString() + " 站・捷運 " + metroStations.length + " 站";
           } catch (error) {
             console.error(error);
             this.transitStatus = "資料載入失敗，請使用本機伺服器";
@@ -2854,50 +3287,94 @@
             this.stopSuggestions = [];
             return;
           }
-          this.stopSuggestions = searchableNodes.filter(function (node) {
+          const source = this.stopMode === "metro" ? searchableMetroNodes : searchableNodes;
+          this.stopSuggestions = source.filter(function (node) {
             return node.name.toLowerCase().includes(query);
           }).slice(0, 8).map(function (node) {
-            return { id: node.id, name: node.name, routeCount: node.routes.size };
+            return {
+              id: node.id,
+              name: node.name,
+              routeCount: node.routes.size,
+              kindLabel: node.mode === "metro" ? "捷運站" : "公車站"
+            };
           });
         },
         chooseStop: function (nodeId, moveMap) {
           const node = transitNodes.get(nodeId);
           if (!node) return;
-          this.activeDistrict = node.district;
+          this.stopMode = node.mode === "metro" ? "metro" : "bus";
+          if (node.mode === "metro" && node.lines && node.lines.size) {
+            this.activeMetroLine = Array.from(node.lines)[0];
+          } else {
+            this.activeDistrict = node.district;
+          }
           this.selectedStartId = nodeId;
           this.stopQuery = node.name;
           this.stopSuggestions = [];
           this.metrics = { stops: "—", routes: "—", distance: "—", wait: "—" };
           this.resultRoutes = [];
+          this.resultMetroLines = [];
           resetMapResults();
           drawOrigin(node);
           if (moveMap !== false) leafletMap.flyTo([node.lat, node.lon], Math.max(leafletMap.getZoom(), 13), { duration: .65 });
         },
         selectDistrict: function (district) {
+          this.stopMode = "bus";
           this.activeDistrict = district;
           this.selectedStartId = null;
           this.stopQuery = "";
           this.stopSuggestions = [];
           this.metrics = { stops: "—", routes: "—", distance: "—", wait: "—" };
           this.resultRoutes = [];
+          this.resultMetroLines = [];
           resetMapResults();
           if (originLayer) originLayer.clearLayers();
+          focusNodeCollection(this.activeDistrictStops, 13);
+        },
+        selectMetroLine: function (lineId) {
+          this.stopMode = "metro";
+          this.activeMetroLine = lineId;
+          this.selectedStartId = null;
+          this.stopQuery = "";
+          this.stopSuggestions = [];
+          this.metrics = { stops: "—", routes: "—", distance: "—", wait: "—" };
+          this.resultRoutes = [];
+          this.resultMetroLines = [];
+          resetMapResults();
+          if (originLayer) originLayer.clearLayers();
+          focusNodeCollection(this.activeMetroStops, 13);
+        },
+        selectStopMode: function (mode) {
+          this.stopMode = mode;
+          this.selectedStartId = null;
+          this.stopQuery = "";
+          this.stopSuggestions = [];
+          this.metrics = { stops: "—", routes: "—", distance: "—", wait: "—" };
+          this.resultRoutes = [];
+          this.resultMetroLines = [];
+          resetMapResults();
+          if (originLayer) originLayer.clearLayers();
+          if (mode === "metro") focusNodeCollection(this.activeMetroStops, 13);
+          else focusNodeCollection(this.activeDistrictStops, 13);
         },
         runReachability: function () {
           if (!this.selectedStartId) return;
           const result = computeReachability(this.selectedStartId, this.minuteLimit);
           const startEdges = transitGraph.get(this.selectedStartId) || [];
-          const minWait = startEdges.length ? Math.min.apply(null, startEdges.map(edgeWait)) : 0;
+          const serviceEdges = startEdges.filter(function (edge) { return edge.mode !== "walk"; });
+          const minWait = serviceEdges.length ? Math.min.apply(null, serviceEdges.map(function (edge) { return edgeWait(edge, 0); })) : 0;
           this.metrics = {
             stops: result.reached.length.toLocaleString(),
             routes: result.routeIds.size.toLocaleString(),
             distance: result.farthestKm.toFixed(1) + " km",
             wait: minWait.toFixed(1) + " 分"
           };
-          this.resultRoutes = listReachableBusRoutes(result.routeIds);
+          this.resultRoutes = listReachableBusRoutes(result.busRouteIds);
+          this.resultMetroLines = listReachableMetroLines(result.metroLineIds);
           animateResult(result);
         },
         focusBusRoute: function (routeId) {
+          this.clearMetroLine();
           this.selectedRouteId = routeId;
           this.selectedRouteInfo = drawSelectedBusRoute(routeId);
         },
@@ -2905,6 +3382,16 @@
           this.selectedRouteId = null;
           this.selectedRouteInfo = null;
           if (selectedBusRouteLayer) selectedBusRouteLayer.clearLayers();
+        },
+        focusMetroLine: function (lineId) {
+          this.clearBusRoute();
+          this.selectedMetroLineId = lineId;
+          this.selectedMetroLineInfo = drawSelectedMetroLine(lineId);
+        },
+        clearMetroLine: function () {
+          this.selectedMetroLineId = null;
+          this.selectedMetroLineInfo = null;
+          if (selectedMetroLineLayer) selectedMetroLineLayer.clearLayers();
         },
         askChip: function (text) {
           this.chatInput = text;
