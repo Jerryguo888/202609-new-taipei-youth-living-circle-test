@@ -1068,6 +1068,117 @@
       background: #0b0e14;
     }
 
+    /* ===== [2026-09-11 新增：同一張 3D 地圖內的交通操作面板] ===== */
+    .population-3d-stage.with-transit {
+      height: min(84vh, 900px);
+      min-height: 700px;
+    }
+
+    .legacy-map-actions { display: flex; align-items: center; gap: 9px; }
+
+    .map-reset-button {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      color: #f3f6f5;
+      font-size: .72rem;
+      font-weight: 760;
+    }
+
+    .map-reset-button:hover { background: rgba(255,255,255,.16); }
+
+    .integrated-transit-panel {
+      position: absolute;
+      z-index: 6;
+      top: 16px;
+      right: 16px;
+      width: min(350px, calc(100% - 32px));
+      max-height: calc(100% - 112px);
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px;
+      background: rgba(17,22,27,.94);
+      color: #f4f7f5;
+      box-shadow: 0 16px 42px rgba(0,0,0,.32);
+      backdrop-filter: blur(14px);
+    }
+
+    .integrated-transit-panel summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 13px 15px;
+      cursor: pointer;
+      list-style: none;
+      font-size: .82rem;
+      font-weight: 780;
+    }
+
+    .integrated-transit-panel summary::-webkit-details-marker { display: none; }
+    .integrated-transit-panel summary::after { content: "收合 −"; color: #aebcb7; font-size: .67rem; }
+    .integrated-transit-panel:not([open]) summary::after { content: "展開 ＋"; }
+
+    .integrated-transit-body {
+      padding: 0 15px 15px;
+      border-top: 1px solid rgba(255,255,255,.09);
+    }
+
+    .integrated-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 12px 0; }
+
+    .integrated-mode-tabs button {
+      min-height: 35px;
+      border-radius: 9px;
+      background: #292f32;
+      color: #aab5b1;
+      font-size: .73rem;
+      font-weight: 760;
+    }
+
+    .integrated-mode-tabs button.active { background: #eef2f0; color: #18201e; }
+
+    .integrated-field { display: grid; gap: 6px; margin-top: 10px; }
+    .integrated-field > span { color: #aebcb7; font-size: .66rem; font-weight: 730; }
+    .integrated-field select,
+    .integrated-field input {
+      width: 100%;
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 9px;
+      outline: 0;
+      background: #242a2d;
+      color: #f3f6f5;
+      font: inherit;
+      font-size: .75rem;
+    }
+
+    .integrated-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    .integrated-minute-row { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 4px; color: #aebcb7; font-size: .68rem; }
+    .integrated-minute-row strong { color: #55e6cf; font-size: .78rem; }
+    .integrated-transit-body > input[type="range"] { width: 100%; accent-color: #45d7c1; }
+
+    .integrated-run {
+      width: 100%;
+      min-height: 42px;
+      margin-top: 11px;
+      border-radius: 10px;
+      background: #e9efec;
+      color: #18201e;
+      font-weight: 820;
+    }
+
+    .integrated-run:disabled { opacity: .42; }
+
+    .integrated-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+    .integrated-metrics div { padding: 8px 4px; border-radius: 9px; background: #242a2d; text-align: center; }
+    .integrated-metrics strong { display: block; color: #fff; font-size: .77rem; }
+    .integrated-metrics span { display: block; margin-top: 2px; color: #8f9c98; font-size: .57rem; }
+    .integrated-model-note { margin: 10px 1px 0; color: #99a6a2; font-size: .64rem; line-height: 1.55; }
+
     #population-3d-map { position: absolute; inset: 0; }
 
     .population-3d-legend,
@@ -1410,6 +1521,12 @@
       .map-wrap, #transit-map { min-height: 65vh; }
       .legacy-map-body { padding: 10px; }
       .population-3d-stage { min-height: 70vh; }
+      .population-3d-stage.with-transit { height: 86vh; min-height: 720px; }
+      .legacy-map-toolbar { align-items: flex-start; flex-direction: column; }
+      .legacy-map-actions { width: 100%; justify-content: space-between; }
+      .population-3d-legend { top: 10px; left: 10px; }
+      .integrated-transit-panel { top: 128px; right: 10px; width: calc(100% - 20px); max-height: calc(100% - 210px); }
+      .population-3d-year-panel { right: 10px; bottom: 10px; width: calc(100% - 20px); }
       .chat-panel { right: 15px; bottom: 86px; }
       .chat-launcher { right: 15px; bottom: 17px; }
     }
@@ -1493,18 +1610,19 @@
         </div>
       </section>
 
-      <!-- ===== [2026-09-11 新增：只組合既有兩個工具，原始分頁與內容保留] ===== -->
+      <!-- ===== [2026-09-11 新增：3D 人口與交通真正疊於同一張圖，原始分頁仍保留] ===== -->
       <section class="view module combined-view" v-show="activeView === 'combined'">
         <div class="module-hero combined-hero">
           <div>
             <p class="section-kicker" style="color:#cbd2cf">Population × Mobility</p>
             <h1>人口與 30 分鐘交通整合地圖</h1>
             <div class="combined-steps" aria-label="整合地圖閱讀順序">
-              <button class="combined-step" @click="scrollToPart('combined-population')"><span>01</span>先看人口與可及性</button>
-              <button class="combined-step" @click="scrollToPart('combined-transit')"><span>02</span>再選站試算 30 分鐘</button>
+              <div class="combined-step"><span>01</span>看鮮豔人口柱</div>
+              <div class="combined-step"><span>02</span>選公車或捷運站</div>
+              <div class="combined-step"><span>03</span>同圖顯示 30 分鐘路網</div>
             </div>
           </div>
-          <p>同一頁保留組員的 3D 人口與交通可及性柱，並接上原本的公車、捷運站點與 30 分鐘路線試算。</p>
+          <p>人口柱、站點、捷運線與計算後的 30 分鐘交通路網，全部疊在同一張可旋轉的 3D 地圖。</p>
         </div>
       </section>
 
@@ -1522,10 +1640,14 @@
           <div class="legacy-map-shell">
             <div class="legacy-map-toolbar">
               <div><strong>新北市 20～34 歲人口分布</strong><span>可旋轉、縮放並切換原資料年份與年齡層</span></div>
-              <span class="legacy-map-badge">組員既有成果</span>
+              <div class="legacy-map-actions">
+                <span class="legacy-map-badge">{{ activeView === 'combined' ? '3D 人口 × 30 分鐘交通' : '組員既有成果' }}</span>
+                <!-- [2026-09-11 新增：一鍵回到新北全區的原始鏡位] -->
+                <button class="map-reset-button" @click="resetPopulationMapView">回到新北全區</button>
+              </div>
             </div>
             <!-- [本次移植：以下容器由新頁面內的 MapLibre 程式直接繪製，不使用 iframe] -->
-            <div class="population-3d-stage">
+            <div class="population-3d-stage" :class="{ 'with-transit': activeView === 'combined' }">
               <div id="population-3d-map" aria-label="新北市青年人口 3D 地圖"></div>
               <div id="population-3d-legend" class="population-3d-legend" hidden>
                 <h3>年齡層</h3>
@@ -1540,6 +1662,64 @@
               </div>
               <div id="population-3d-tooltip" class="population-3d-tooltip"></div>
               <div id="population-3d-status" class="population-3d-status">歷年人口資料載入中…</div>
+
+              <!-- [2026-09-11 新增：整合頁直接在同一張 3D 圖操作交通，不再放第二張 Leaflet 圖] -->
+              <details class="integrated-transit-panel" v-if="activeView === 'combined'" open>
+                <summary>30 分鐘交通分析</summary>
+                <div class="integrated-transit-body">
+                  <div class="integrated-mode-tabs">
+                    <button :class="{ active: stopMode === 'bus' }" @click="selectStopMode('bus')">公車站</button>
+                    <button :class="{ active: stopMode === 'metro' }" @click="selectStopMode('metro')">捷運站</button>
+                  </div>
+
+                  <template v-if="stopMode === 'bus'">
+                    <label class="integrated-field">
+                      <span>行政區</span>
+                      <select v-model="activeDistrict" @change="selectDistrict(activeDistrict)" :disabled="!transitLoaded">
+                        <option v-for="group in stationGroups" :key="group.name" :value="group.name">{{ group.name }}（{{ group.stops.length }}）</option>
+                      </select>
+                    </label>
+                    <label class="integrated-field">
+                      <span>出發公車站</span>
+                      <select v-model="selectedStartId" @change="chooseStop(selectedStartId, true)" :disabled="!transitLoaded">
+                        <option :value="null" disabled>請選擇站位</option>
+                        <option v-for="stop in activeDistrictStops" :key="stop.id" :value="stop.id">{{ stop.name }}（{{ stop.routeCount }} 路線）</option>
+                      </select>
+                    </label>
+                  </template>
+
+                  <template v-else>
+                    <label class="integrated-field">
+                      <span>捷運路線</span>
+                      <select v-model="activeMetroLine" @change="selectMetroLine(activeMetroLine)" :disabled="!transitLoaded">
+                        <option v-for="group in metroGroups" :key="group.id" :value="group.id">{{ group.name }}（{{ group.stops.length }} 站）</option>
+                      </select>
+                    </label>
+                    <label class="integrated-field">
+                      <span>出發捷運站</span>
+                      <select v-model="selectedStartId" @change="chooseStop(selectedStartId, true)" :disabled="!transitLoaded">
+                        <option :value="null" disabled>請選擇捷運站</option>
+                        <option v-for="stop in activeMetroStops" :key="stop.id" :value="stop.id">{{ stop.name }}（{{ stop.lineNames }}）</option>
+                      </select>
+                    </label>
+                  </template>
+
+                  <div class="integrated-field-row">
+                    <label class="integrated-field"><span>出發時間</span><input type="time" v-model="departureTime"></label>
+                    <label class="integrated-field"><span>動畫速度</span><select v-model.number="animationSpeed"><option :value="1">1×</option><option :value="2">2×</option><option :value="4">4×</option></select></label>
+                  </div>
+                  <div class="integrated-minute-row"><span>可達時間上限</span><strong>{{ minuteLimit }} 分</strong></div>
+                  <input type="range" min="10" max="60" step="5" v-model.number="minuteLimit">
+                  <button class="integrated-run" :disabled="transitLoading || !selectedStartId" @click="runReachability">計算可達範圍</button>
+                  <div class="integrated-metrics">
+                    <div><strong>{{ metrics.stops }}</strong><span>站位</span></div>
+                    <div><strong>{{ metrics.routes }}</strong><span>路線</span></div>
+                    <div><strong>{{ metrics.distance }}</strong><span>最遠距離</span></div>
+                    <div><strong>{{ metrics.wait }}</strong><span>起始候車</span></div>
+                  </div>
+                  <p class="integrated-model-note">已納入平均候車、站間行駛、停靠、步行轉乘與轉乘候車；目前為規劃估算。</p>
+                </div>
+              </details>
             </div>
           </div>
         </div>
@@ -1620,9 +1800,9 @@
         </div>
       </section>
 
-      <!-- ===== [原本 30 分鐘分頁保留；整合頁僅額外顯示同一份內容] ===== -->
+      <!-- ===== [原本 30 分鐘 Leaflet 分頁完整保留；整合頁不再重複第二張圖] ===== -->
       <section id="combined-transit" class="view module combined-part"
-               v-show="activeView === 'transit' || activeView === 'combined'">
+               v-show="activeView === 'transit'">
         <div class="transit-layout">
           <aside class="transit-sidebar">
             <p class="section-kicker">交通分析</p>
@@ -1920,13 +2100,30 @@
     let stopLayerEventsBound = false;
     let population3dMap = null;
     let population3dLoading = false;
+    let population3dBaseReady = false;
+    let population3dBounds = null;
+    let integratedTransitReady = false;
     let networkLoadPromise = null;
     let transitReachCache = null;
     let transitReachCachePromise = null;
     let districtStationTotals = null;
+    let districtReachSampleCounts = null;
     let originSeedIndex = null;
     let popByYearRef = {};
     let appVm = null;
+
+    /* [2026-09-11 新增：整合頁交通圖層清單；切回原 3D 分頁時只隱藏，不更動組員資料] */
+    const INTEGRATED_TRANSIT_LAYER_IDS = [
+      "integrated-metro-lines",
+      "integrated-result-lines",
+      "integrated-bus-clusters",
+      "integrated-bus-cluster-count",
+      "integrated-bus-stops",
+      "integrated-result-points",
+      "integrated-metro-stations",
+      "integrated-origin-glow",
+      "integrated-origin"
+    ];
 
     function parseCSV(text) {
       const matrix = [];
@@ -2543,22 +2740,36 @@
       return networkLoadPromise;
     }
 
-    /* [本次新增：每個交通節點 30 分鐘可達站數 ÷ 該行政區站數 × 該行政區青年人口，
-       批次計算避免單一畫面凍結，計算一次後快取供年份切換重複使用] */
+    /* [2026-09-11 效能修正：以各行政區分層抽樣估算平均可達站數。
+       原版逐一運算 8,000 多站會讓 WebGL 長時間無法回應；每區均勻取最多 8 站，
+       仍保留行政區層級比較用途，且不更動組員原始 3d_map 檔案。] */
     function ensureTransitReachCache(onProgress) {
       if (transitReachCache) return Promise.resolve(transitReachCache);
       if (transitReachCachePromise) return transitReachCachePromise;
       transitReachCachePromise = new Promise(function (resolve) {
         const cache = new Map();
         const totals = new Map();
+        const nodesByDistrict = new Map();
         transitNodes.forEach(function (node) {
           totals.set(node.district, (totals.get(node.district) || 0) + 1);
+          if (!nodesByDistrict.has(node.district)) nodesByDistrict.set(node.district, []);
+          nodesByDistrict.get(node.district).push(node.id);
         });
-        const ids = Array.from(transitNodes.keys());
+        const ids = [];
+        const sampleCounts = new Map();
+        nodesByDistrict.forEach(function (nodeIds, district) {
+          const take = Math.min(8, nodeIds.length);
+          const selected = [];
+          for (let i = 0; i < take; i += 1) {
+            const index = take === 1 ? 0 : Math.round(i * (nodeIds.length - 1) / (take - 1));
+            if (!selected.includes(nodeIds[index])) selected.push(nodeIds[index]);
+          }
+          selected.forEach(function (id) { ids.push(id); });
+          sampleCounts.set(district, selected.length);
+        });
         let index = 0;
         function step() {
-          /* [2026-09-11 效能修正：縮小每批運算量，讓 3D 背景計算時仍可操作地圖] */
-          const chunkEnd = Math.min(index + 24, ids.length);
+          const chunkEnd = Math.min(index + 4, ids.length);
           for (; index < chunkEnd; index++) {
             const id = ids[index];
             cache.set(id, computeReachability(id, 30).reached.length);
@@ -2569,6 +2780,7 @@
           } else {
             transitReachCache = cache;
             districtStationTotals = totals;
+            districtReachSampleCounts = sampleCounts;
             resolve(cache);
           }
         }
@@ -2594,8 +2806,9 @@
       const scores = new Map();
       reachSumByDistrict.forEach(function (reachSum, district) {
         const totalStations = districtStationTotals.get(district);
-        if (!totalStations) return;
-        const avgReach = reachSum / totalStations;
+        const sampleCount = districtReachSampleCounts.get(district);
+        if (!totalStations || !sampleCount) return;
+        const avgReach = reachSum / sampleCount;
         const youthPop = youthByDistrict.get(district) || 0;
         scores.set(district, (avgReach / totalStations) * youthPop);
       });
@@ -3099,6 +3312,341 @@
       }
     }
 
+    /* ===== [2026-09-11 新增：3D 人口圖上的公車／捷運／30 分鐘路網開始] ===== */
+    function emptyFeatureCollection() {
+      return { type: "FeatureCollection", features: [] };
+    }
+
+    function setIntegratedSourceData(sourceId, data) {
+      if (!population3dMap) return;
+      const source = population3dMap.getSource(sourceId);
+      if (source) source.setData(data || emptyFeatureCollection());
+    }
+
+    function integratedBaseCollections() {
+      const busFeatures = searchableNodes.map(function (node) {
+        return {
+          type: "Feature",
+          properties: { id: node.id, name: node.name, district: node.district },
+          geometry: { type: "Point", coordinates: [node.lon, node.lat] }
+        };
+      });
+      const metroLineFeatures = [];
+      metroRoutes.forEach(function (route) {
+        const coordinates = route.stations.map(function (station) { return [station.lon, station.lat]; });
+        if (coordinates.length < 2) return;
+        metroLineFeatures.push({
+          type: "Feature",
+          properties: { lineId: route.lineId, name: route.name, color: route.color || "#4cc9ff" },
+          geometry: { type: "LineString", coordinates: coordinates }
+        });
+      });
+      const metroFeatures = searchableMetroNodes.map(function (node) {
+        const lineIds = Array.from(node.lines || []);
+        const line = metroLineMeta.get(lineIds[0]) || {};
+        return {
+          type: "Feature",
+          properties: {
+            id: node.id,
+            name: node.name,
+            lines: lineIds.map(function (id) { return (metroLineMeta.get(id) || {}).name || id; }).join("、"),
+            color: line.color || "#4cc9ff"
+          },
+          geometry: { type: "Point", coordinates: [node.lon, node.lat] }
+        };
+      });
+      return {
+        bus: { type: "FeatureCollection", features: busFeatures },
+        metroLines: { type: "FeatureCollection", features: metroLineFeatures },
+        metroStations: { type: "FeatureCollection", features: metroFeatures }
+      };
+    }
+
+    function setIntegratedTransitVisibility(visible) {
+      if (!population3dMap || !integratedTransitReady) return;
+      INTEGRATED_TRANSIT_LAYER_IDS.forEach(function (layerId) {
+        if (population3dMap.getLayer(layerId)) {
+          population3dMap.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+        }
+      });
+      const mapElement = document.getElementById("population-3d-map");
+      if (mapElement) mapElement.dataset.transitLayers = visible ? "visible" : "hidden";
+    }
+
+    function bindIntegratedPointerLayer(layerId) {
+      population3dMap.on("mouseenter", layerId, function () { population3dMap.getCanvas().style.cursor = "pointer"; });
+      population3dMap.on("mouseleave", layerId, function () { population3dMap.getCanvas().style.cursor = ""; });
+    }
+
+    function ensureIntegratedTransitLayers() {
+      const diagnosticElement = document.getElementById("population-3d-map");
+      if (diagnosticElement) diagnosticElement.dataset.transitLayerAttempt = [
+        population3dMap ? "map" : "no-map",
+        population3dBaseReady ? "base-ready" : "base-waiting",
+        "nodes-" + transitNodes.size
+      ].join("|");
+      if (!population3dMap || !population3dBaseReady || !transitNodes.size) return;
+      if (integratedTransitReady) {
+        setIntegratedTransitVisibility(appVm && appVm.activeView === "combined");
+        return;
+      }
+
+      const base = integratedBaseCollections();
+      population3dMap.addSource("integrated-bus-source", {
+        type: "geojson",
+        data: base.bus,
+        cluster: true,
+        clusterMaxZoom: 13,
+        clusterRadius: 34
+      });
+      population3dMap.addSource("integrated-metro-line-source", { type: "geojson", data: base.metroLines });
+      population3dMap.addSource("integrated-metro-station-source", { type: "geojson", data: base.metroStations });
+      population3dMap.addSource("integrated-result-line-source", { type: "geojson", data: emptyFeatureCollection() });
+      population3dMap.addSource("integrated-result-point-source", { type: "geojson", data: emptyFeatureCollection() });
+      population3dMap.addSource("integrated-origin-source", { type: "geojson", data: emptyFeatureCollection() });
+
+      population3dMap.addLayer({
+        id: "integrated-metro-lines",
+        type: "line",
+        source: "integrated-metro-line-source",
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.2, 13, 5.5],
+          "line-opacity": .88
+        }
+      });
+      population3dMap.addLayer({
+        id: "integrated-result-lines",
+        type: "line",
+        source: "integrated-result-line-source",
+        paint: {
+          "line-color": ["get", "color"],
+          "line-width": ["case", ["==", ["get", "mode"], "metro"], 5, 2.8],
+          "line-opacity": .94
+        }
+      });
+      population3dMap.addLayer({
+        id: "integrated-bus-clusters",
+        type: "circle",
+        source: "integrated-bus-source",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#66716f",
+          "circle-radius": ["step", ["get", "point_count"], 13, 30, 16, 100, 20],
+          "circle-stroke-color": "#e5e9e7",
+          "circle-stroke-width": 1.5,
+          "circle-opacity": .9
+        }
+      });
+      population3dMap.addLayer({
+        id: "integrated-bus-cluster-count",
+        type: "symbol",
+        source: "integrated-bus-source",
+        filter: ["has", "point_count"],
+        layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 10 },
+        paint: { "text-color": "#ffffff" }
+      });
+      population3dMap.addLayer({
+        id: "integrated-bus-stops",
+        type: "circle",
+        source: "integrated-bus-source",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-color": "#899390",
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3.5, 14, 6],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.4,
+          "circle-opacity": .94
+        }
+      });
+      population3dMap.addLayer({
+        id: "integrated-result-points",
+        type: "circle",
+        source: "integrated-result-point-source",
+        paint: {
+          "circle-color": ["interpolate", ["linear"], ["get", "minutes"], 0, "#35ead0", 20, "#ffe05d", 30, "#ff7c69", 60, "#ef4f67"],
+          "circle-radius": ["case", ["==", ["get", "mode"], "metro"], 7.5, 5],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.5,
+          "circle-opacity": .98
+        }
+      });
+      population3dMap.addLayer({
+        id: "integrated-metro-stations",
+        type: "circle",
+        source: "integrated-metro-station-source",
+        paint: {
+          "circle-color": ["get", "color"],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4.5, 13, 7.5],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2,
+          "circle-opacity": .98
+        }
+      });
+      population3dMap.addLayer({
+        id: "integrated-origin-glow",
+        type: "circle",
+        source: "integrated-origin-source",
+        paint: { "circle-color": "#ff574b", "circle-radius": 18, "circle-opacity": .22 }
+      });
+      population3dMap.addLayer({
+        id: "integrated-origin",
+        type: "circle",
+        source: "integrated-origin-source",
+        paint: {
+          "circle-color": "#ff574b",
+          "circle-radius": 7,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2.2
+        }
+      });
+
+      integratedTransitReady = true;
+      const mapElement = document.getElementById("population-3d-map");
+      if (mapElement) mapElement.dataset.transitLayerCount = String(INTEGRATED_TRANSIT_LAYER_IDS.length);
+      setIntegratedTransitVisibility(appVm && appVm.activeView === "combined");
+      if (appVm && appVm.selectedStartId) drawIntegratedOrigin(transitNodes.get(appVm.selectedStartId), false);
+
+      population3dMap.on("click", "integrated-bus-clusters", function (event) {
+        const feature = event.features && event.features[0];
+        const source = population3dMap.getSource("integrated-bus-source");
+        if (!feature || !source) return;
+        Promise.resolve(source.getClusterExpansionZoom(feature.properties.cluster_id)).then(function (zoom) {
+          population3dMap.easeTo({ center: feature.geometry.coordinates, zoom: zoom, duration: 550 });
+        });
+      });
+      population3dMap.on("click", "integrated-bus-stops", function (event) {
+        const feature = event.features && event.features[0];
+        if (feature && appVm) appVm.chooseStop(feature.properties.id, true);
+      });
+      population3dMap.on("click", "integrated-metro-stations", function (event) {
+        const feature = event.features && event.features[0];
+        if (feature && appVm) appVm.chooseStop(feature.properties.id, true);
+      });
+      population3dMap.on("click", "integrated-result-points", function (event) {
+        const feature = event.features && event.features[0];
+        if (feature && appVm) appVm.chooseStop(feature.properties.id, true);
+      });
+      ["integrated-bus-clusters", "integrated-bus-stops", "integrated-metro-stations", "integrated-result-points"].forEach(bindIntegratedPointerLayer);
+    }
+
+    function clearIntegratedResults(clearOrigin) {
+      setIntegratedSourceData("integrated-result-line-source", emptyFeatureCollection());
+      setIntegratedSourceData("integrated-result-point-source", emptyFeatureCollection());
+      if (clearOrigin !== false) setIntegratedSourceData("integrated-origin-source", emptyFeatureCollection());
+    }
+
+    function drawIntegratedOrigin(node, moveMap) {
+      if (!integratedTransitReady || !node) return;
+      setIntegratedSourceData("integrated-origin-source", {
+        type: "FeatureCollection",
+        features: [{
+          type: "Feature",
+          properties: { id: node.id, name: node.name },
+          geometry: { type: "Point", coordinates: [node.lon, node.lat] }
+        }]
+      });
+      if (moveMap !== false) {
+        population3dMap.easeTo({
+          center: [node.lon, node.lat],
+          zoom: Math.max(population3dMap.getZoom(), 12.5),
+          pitch: 55,
+          duration: 650
+        });
+      }
+    }
+
+    function focusIntegratedNodes(stops, maxZoom) {
+      if (!population3dMap || !stops || !stops.length) return;
+      const nodes = stops.map(function (stop) { return transitNodes.get(stop.id); }).filter(Boolean);
+      if (nodes.length === 1) {
+        population3dMap.easeTo({ center: [nodes[0].lon, nodes[0].lat], zoom: maxZoom || 13, pitch: 55, duration: 550 });
+        return;
+      }
+      if (nodes.length > 1) {
+        const bounds = new maplibregl.LngLatBounds();
+        nodes.forEach(function (node) { bounds.extend([node.lon, node.lat]); });
+        population3dMap.fitBounds(bounds, { padding: 70, maxZoom: maxZoom || 13, duration: 550 });
+      }
+    }
+
+    function integratedResultCollections(result) {
+      const lines = [];
+      const points = [];
+      const seen = new Set();
+      result.reached.forEach(function (item, index) {
+        const node = transitNodes.get(item.nodeId);
+        if (!node) return;
+        points.push({
+          type: "Feature",
+          properties: { id: node.id, name: node.name, minutes: item.time, mode: node.mode },
+          geometry: { type: "Point", coordinates: [node.lon, node.lat] }
+        });
+        if (!index) return;
+        const step = result.predecessor.get(item.stateKey);
+        if (!step) return;
+        const from = transitNodes.get(step.edge.from);
+        const to = transitNodes.get(step.edge.to);
+        const key = step.edge.from + "|" + step.edge.to + "|" + step.edge.routeId;
+        if (!from || !to || seen.has(key)) return;
+        seen.add(key);
+        const lineColor = step.edge.mode === "metro"
+          ? ((metroLineMeta.get(step.edge.lineId) || {}).color || "#4cc9ff")
+          : step.edge.mode === "walk" ? "#aeb8b5" : "#28e0c3";
+        lines.push({
+          type: "Feature",
+          properties: { mode: step.edge.mode || "bus", color: lineColor },
+          geometry: { type: "LineString", coordinates: [[from.lon, from.lat], [to.lon, to.lat]] }
+        });
+      });
+      return {
+        lines: { type: "FeatureCollection", features: lines },
+        points: { type: "FeatureCollection", features: points }
+      };
+    }
+
+    function animateIntegratedResult(result) {
+      if (!integratedTransitReady) return;
+      clearIntegratedResults(false);
+      const collections = integratedResultCollections(result);
+      setIntegratedSourceData("integrated-result-line-source", collections.lines);
+      const start = transitNodes.get(result.startId);
+      drawIntegratedOrigin(start, false);
+
+      if (start && result.reached.length > 1) {
+        let latDelta = .006;
+        let lonDelta = .008;
+        result.reached.forEach(function (item) {
+          const node = transitNodes.get(item.nodeId);
+          if (!node) return;
+          latDelta = Math.max(latDelta, Math.abs(node.lat - start.lat));
+          lonDelta = Math.max(lonDelta, Math.abs(node.lon - start.lon));
+        });
+        population3dMap.fitBounds([
+          [start.lon - lonDelta * 1.12, start.lat - latDelta * 1.12],
+          [start.lon + lonDelta * 1.12, start.lat + latDelta * 1.12]
+        ], { padding: window.innerWidth <= 820 ? 34 : 82, maxZoom: 13, duration: 650 });
+      }
+
+      let elapsed = 0;
+      const tickMs = 170 / appVm.animationSpeed;
+      function tick() {
+        appVm.animationClock = String(Math.floor(elapsed)).padStart(2, "0") + ":00";
+        setIntegratedSourceData("integrated-result-point-source", {
+          type: "FeatureCollection",
+          features: collections.points.features.filter(function (feature) { return feature.properties.minutes <= elapsed; })
+        });
+        if (elapsed < result.maxMinutes) {
+          elapsed += 1;
+          animationTimer = setTimeout(tick, tickMs);
+        } else {
+          animationTimer = null;
+        }
+      }
+      tick();
+    }
+    /* ===== [2026-09-11 新增：3D 人口圖上的公車／捷運／30 分鐘路網結束] ===== */
+
     function animateResult(result) {
       resetMapResults();
       drawResultContext(result);
@@ -3147,7 +3695,10 @@
 
     async function initPopulation3dMap() {
       if (population3dMap) {
-        setTimeout(function () { population3dMap.resize(); }, 0);
+        setTimeout(function () {
+          population3dMap.resize();
+          setIntegratedTransitVisibility(appVm && appVm.activeView === "combined");
+        }, 0);
         return;
       }
       if (population3dLoading) return;
@@ -3198,8 +3749,8 @@
         if (!years.length) throw new Error("CSV 交叉比對後沒有可顯示資料");
 
         const ageGroups = ["20~29歲", "30~34歲", "交通可及性"];
-        /* [2026-09-11 改版：3D 柱改用高對比灰階，避免與黑底圖、交通線色互相干擾] */
-        const colors = ["#e4e8e6", "#929c98", "#ffffff"];
+        /* [2026-09-11 修正：底圖維持黑灰，但人口／可及性柱恢復鮮豔高對比色] */
+        const colors = ["#24d7ff", "#ff4f9a", "#ffd447"];
         const selectedAges = new Set(ageGroups);
         let maxTotal = 0;
         years.forEach(function (year) {
@@ -3285,6 +3836,7 @@
 
         const bounds = new maplibregl.LngLatBounds();
         popByYear[currentYear].forEach(function (row) { bounds.extend([row.lon, row.lat]); });
+        population3dBounds = bounds;
         population3dMap = new maplibregl.Map({
           container: "population-3d-map",
           style: {
@@ -3328,6 +3880,7 @@
         }
 
         population3dMap.on("load", function () {
+          population3dBaseReady = true;
           status.hidden = true;
           legend.hidden = false;
           yearPanel.hidden = false;
@@ -3368,9 +3921,13 @@
           population3dMap.setPitch(55);
           population3dMap.setBearing(-10);
 
+          /* [2026-09-11 新增：若交通網路已完成，立刻疊到這張 3D 圖；獨立人口頁會自動隱藏] */
+          ensureIntegratedTransitLayers();
+
           /* [本次新增：每站 30 分鐘可達站數 ÷ 行政區站數 × 行政區青年人口，
              平均到行政區後疊加為柱狀圖第三段，直接堆在 20~29 歲、30~34 歲上面] */
           loadNetworkCore().then(function () {
+            ensureIntegratedTransitLayers();
             status.hidden = false;
             status.classList.remove("error");
             status.textContent = "計算交通節點可及性中…";
@@ -3550,21 +4107,46 @@
           window.location.hash = view;
           window.scrollTo({ top: 0, behavior: "smooth" });
           await nextTick();
-          if (view === "transit" || view === "combined") {
+          /* [2026-09-11 修正：獨立交通頁才建立 Leaflet；整合頁只用同一張 MapLibre 3D 圖] */
+          if (view === "transit") {
             initLeaflet();
             leafletMap.invalidateSize();
             await this.loadTransit();
           }
-          if (view === "map3d" || view === "combined") initPopulation3dMap();
+          if (view === "combined") {
+            initPopulation3dMap();
+            await this.loadTransit();
+            ensureIntegratedTransitLayers();
+            setIntegratedTransitVisibility(true);
+          } else if (view === "map3d") {
+            initPopulation3dMap();
+            setIntegratedTransitVisibility(false);
+          } else {
+            setIntegratedTransitVisibility(false);
+          }
         },
-        /* [2026-09-11 新增：整合頁兩張地圖的快速導覽] */
-        scrollToPart: async function (id) {
-          await nextTick();
-          const target = document.getElementById(id);
-          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        resetPopulationMapView: function () {
+          if (!population3dMap || !population3dBounds) return;
+          /* 先還原俯角與方位，再依同一鏡位計算完整 bounds；避免第二段動畫蓋掉縮放。 */
+          population3dMap.jumpTo({ pitch: 55, bearing: -10 });
+          population3dMap.fitBounds(population3dBounds, {
+            padding: window.innerWidth <= 820 ? 34 : 70,
+            duration: 650,
+            maxZoom: 10
+          });
         },
         loadTransit: async function () {
-          if (this.transitLoaded || this.transitLoading) return;
+          if (this.transitLoaded) {
+            if (leafletMap && this.activeView === "transit") {
+              bindStopLayerEvents();
+              renderMetroReference();
+              renderBaseStops();
+              if (this.selectedStartId) drawOrigin(transitNodes.get(this.selectedStartId));
+            }
+            ensureIntegratedTransitLayers();
+            return;
+          }
+          if (this.transitLoading) return;
           this.transitLoading = true;
           this.transitStatus = "讀取新北官方資料…";
           try {
@@ -3574,11 +4156,14 @@
             if (!this.metroGroups.some(function (group) { return group.id === this.activeMetroLine; }, this) && this.metroGroups[0]) {
               this.activeMetroLine = this.metroGroups[0].id;
             }
-            bindStopLayerEvents();
-            renderMetroReference();
-            renderBaseStops();
+            if (leafletMap && this.activeView === "transit") {
+              bindStopLayerEvents();
+              renderMetroReference();
+              renderBaseStops();
+            }
+            ensureIntegratedTransitLayers();
             const defaultNode = nearestNode(25.0142, 121.4639).node;
-            if (defaultNode) this.chooseStop(defaultNode.id, false);
+            if (defaultNode && !this.selectedStartId) this.chooseStop(defaultNode.id, false);
             this.transitLoaded = true;
             this.transitStatus = "公車 " + searchableNodes.length.toLocaleString() + " 站・捷運 " + metroStations.length + " 站";
           } catch (error) {
@@ -3587,7 +4172,8 @@
           } finally {
             this.transitLoading = false;
             await nextTick();
-            leafletMap.invalidateSize();
+            if (leafletMap && this.activeView === "transit") leafletMap.invalidateSize();
+            if (population3dMap && this.activeView === "combined") population3dMap.resize();
           }
         },
         findStops: function () {
@@ -3624,8 +4210,12 @@
           this.resultRoutes = [];
           this.resultMetroLines = [];
           resetMapResults();
-          drawOrigin(node);
-          if (moveMap !== false) leafletMap.flyTo([node.lat, node.lon], Math.max(leafletMap.getZoom(), 13), { duration: .65 });
+          clearIntegratedResults(false);
+          if (leafletMap && this.activeView === "transit") {
+            drawOrigin(node);
+            if (moveMap !== false) leafletMap.flyTo([node.lat, node.lon], Math.max(leafletMap.getZoom(), 13), { duration: .65 });
+          }
+          if (population3dMap && this.activeView === "combined") drawIntegratedOrigin(node, moveMap);
         },
         selectDistrict: function (district) {
           this.stopMode = "bus";
@@ -3637,8 +4227,10 @@
           this.resultRoutes = [];
           this.resultMetroLines = [];
           resetMapResults();
+          clearIntegratedResults();
           if (originLayer) originLayer.clearLayers();
-          focusNodeCollection(this.activeDistrictStops, 13);
+          if (this.activeView === "combined") focusIntegratedNodes(this.activeDistrictStops, 13);
+          else focusNodeCollection(this.activeDistrictStops, 13);
         },
         selectMetroLine: function (lineId) {
           this.stopMode = "metro";
@@ -3650,8 +4242,10 @@
           this.resultRoutes = [];
           this.resultMetroLines = [];
           resetMapResults();
+          clearIntegratedResults();
           if (originLayer) originLayer.clearLayers();
-          focusNodeCollection(this.activeMetroStops, 13);
+          if (this.activeView === "combined") focusIntegratedNodes(this.activeMetroStops, 13);
+          else focusNodeCollection(this.activeMetroStops, 13);
         },
         selectStopMode: function (mode) {
           this.stopMode = mode;
@@ -3662,9 +4256,11 @@
           this.resultRoutes = [];
           this.resultMetroLines = [];
           resetMapResults();
+          clearIntegratedResults();
           if (originLayer) originLayer.clearLayers();
-          if (mode === "metro") focusNodeCollection(this.activeMetroStops, 13);
-          else focusNodeCollection(this.activeDistrictStops, 13);
+          const stops = mode === "metro" ? this.activeMetroStops : this.activeDistrictStops;
+          if (this.activeView === "combined") focusIntegratedNodes(stops, 13);
+          else focusNodeCollection(stops, 13);
         },
         runReachability: function () {
           if (!this.selectedStartId) return;
@@ -3680,7 +4276,8 @@
           };
           this.resultRoutes = listReachableBusRoutes(result.busRouteIds);
           this.resultMetroLines = listReachableMetroLines(result.metroLineIds);
-          animateResult(result);
+          if (this.activeView === "combined") animateIntegratedResult(result);
+          else animateResult(result);
         },
         focusBusRoute: function (routeId) {
           this.clearMetroLine();
@@ -3764,7 +4361,7 @@
       mounted: async function () {
         const hash = window.location.hash.replace("#", "");
         if (this.navItems.some(function (item) { return item.id === hash; })) this.activeView = hash;
-        if (this.activeView === "transit" || this.activeView === "combined") {
+        if (this.activeView === "transit") {
           await nextTick();
           initLeaflet();
           await this.loadTransit();
@@ -3772,6 +4369,10 @@
         if (this.activeView === "map3d" || this.activeView === "combined") {
           await nextTick();
           initPopulation3dMap();
+          if (this.activeView === "combined") {
+            await this.loadTransit();
+            ensureIntegratedTransitLayers();
+          }
         }
         window.addEventListener("hashchange", () => {
           const next = window.location.hash.replace("#", "");
