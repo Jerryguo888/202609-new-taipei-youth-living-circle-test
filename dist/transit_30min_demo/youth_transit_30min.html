@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="新北青年生活圈預測、公共資源缺口與 30 分鐘服務選址平台。">
   <title>青年生活圈｜新北公共資源決策平台</title>
+  <!-- [2026-09-11 修正：直接雙擊 HTML 時改開正式 GitHub Pages，避免 file:// CORS 導致所有 CSV 失敗] -->
+  <script>
+    if (window.location.protocol === "file:") {
+      window.location.replace(
+        "https://jerryguo888.github.io/202609-new-taipei-youth-living-circle-test/transit_30min_demo/youth_transit_30min.html" +
+        (window.location.hash || "#home")
+      );
+    }
+  </script>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://tile.openstreetmap.org">
   <link rel="preconnect" href="https://a.basemaps.cartocdn.com">
@@ -2021,8 +2030,6 @@
   <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <!-- map-config.local.js is gitignored; see map-config.example.js for the template -->
-  <script src="map-config.local.js"></script>
   <script>
     /* ===== [改版保留：官方公車資料與演算法核心開始] ===== */
     const DATA_FILES = {
@@ -2148,7 +2155,9 @@
       "integrated-result-lines",
       "integrated-bus-clusters",
       "integrated-bus-cluster-count",
+      "integrated-bus-cluster-hit",
       "integrated-bus-stops",
+      "integrated-bus-stop-hit",
       "integrated-result-points",
       "integrated-metro-stations",
       "integrated-origin-glow",
@@ -3476,6 +3485,18 @@
         layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 10 },
         paint: { "text-color": "#ffffff" }
       });
+      /* [2026-09-11 修正：群組點保留原尺寸，另外加大透明熱區避免旋轉地圖時點不到] */
+      population3dMap.addLayer({
+        id: "integrated-bus-cluster-hit",
+        type: "circle",
+        source: "integrated-bus-source",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#000000",
+          "circle-radius": ["step", ["get", "point_count"], 20, 30, 23, 100, 27],
+          "circle-opacity": .01
+        }
+      });
       population3dMap.addLayer({
         id: "integrated-bus-stops",
         type: "circle",
@@ -3487,6 +3508,18 @@
           "circle-stroke-color": "#ffffff",
           "circle-stroke-width": 1.4,
           "circle-opacity": .94
+        }
+      });
+      /* [2026-09-11 修正：灰色站點視覺維持 3.5～6px，但滑鼠／觸控可按範圍擴為 12～15px] */
+      population3dMap.addLayer({
+        id: "integrated-bus-stop-hit",
+        type: "circle",
+        source: "integrated-bus-source",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-color": "#000000",
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 12, 14, 15],
+          "circle-opacity": .01
         }
       });
       population3dMap.addLayer({
@@ -3537,7 +3570,7 @@
       setIntegratedTransitVisibility(appVm && appVm.activeView === "combined");
       if (appVm && appVm.selectedStartId) drawIntegratedOrigin(transitNodes.get(appVm.selectedStartId), false);
 
-      population3dMap.on("click", "integrated-bus-clusters", function (event) {
+      population3dMap.on("click", "integrated-bus-cluster-hit", function (event) {
         const feature = event.features && event.features[0];
         const source = population3dMap.getSource("integrated-bus-source");
         if (!feature || !source) return;
@@ -3545,7 +3578,7 @@
           population3dMap.easeTo({ center: feature.geometry.coordinates, zoom: zoom, duration: 550 });
         });
       });
-      population3dMap.on("click", "integrated-bus-stops", function (event) {
+      population3dMap.on("click", "integrated-bus-stop-hit", function (event) {
         const feature = event.features && event.features[0];
         if (feature && appVm) appVm.chooseStop(feature.properties.id, true);
       });
@@ -3557,7 +3590,7 @@
         const feature = event.features && event.features[0];
         if (feature && appVm) appVm.chooseStop(feature.properties.id, true);
       });
-      ["integrated-bus-clusters", "integrated-bus-stops", "integrated-metro-stations", "integrated-result-points"].forEach(bindIntegratedPointerLayer);
+      ["integrated-bus-cluster-hit", "integrated-bus-stop-hit", "integrated-metro-stations", "integrated-result-points"].forEach(bindIntegratedPointerLayer);
     }
 
     function clearIntegratedResults(clearOrigin) {
@@ -4197,7 +4230,7 @@
             this.transitStatus = "公車 " + searchableNodes.length.toLocaleString() + " 站・捷運 " + metroStations.length + " 站";
           } catch (error) {
             console.error(error);
-            this.transitStatus = "資料載入失敗，請使用本機伺服器";
+            this.transitStatus = "資料載入失敗。" + dataLoadHint();
           } finally {
             this.transitLoading = false;
             await nextTick();
