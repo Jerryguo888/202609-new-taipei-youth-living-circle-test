@@ -1527,8 +1527,9 @@
       .population-3d-legend { top: 10px; left: 10px; }
       .integrated-transit-panel { top: 128px; right: 10px; width: calc(100% - 20px); max-height: calc(100% - 210px); }
       .population-3d-year-panel { right: 10px; bottom: 10px; width: calc(100% - 20px); }
-      .chat-panel { right: 15px; bottom: 86px; }
-      .chat-launcher { right: 15px; bottom: 17px; }
+      /* [2026-09-11 RWD 修正：手機已有頁首 AI 入口，隱藏重複浮鈕避免遮住地圖操作] */
+      .chat-panel { right: 10px; bottom: 10px; left: 10px; width: auto; }
+      .chat-launcher { display: none; }
     }
   </style>
 </head>
