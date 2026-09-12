@@ -129,7 +129,7 @@ function handleTransitLayerChange(mode, event) {
                 <!-- [Jerry 2026-09-13 新增：清除本次 30 分鐘結果並停止動畫，
                      回到人口柱與基礎交通標點的初始顯示。] -->
                 <button type="button" class="map-clear-button" :disabled="!appState.reachabilityActive"
-                        @click="appState.clearReachability">清空 30 分鐘結果</button>
+                        @click="appState.clearReachability">清空結果</button>
                 <button class="map-reset-button" @click="appState.resetPopulationMapView">回到新北全區</button>
                   </div>
                 </details>
