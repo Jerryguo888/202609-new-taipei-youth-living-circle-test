@@ -332,6 +332,7 @@
       display: grid;
       grid-template-columns: 1fr;
       max-width: 640px;
+      margin: 0 auto;
       gap: 14px;
     }
 
@@ -370,6 +371,33 @@
 
     .resource-chart-bars { display: grid; gap: 13px; }
 
+    /* [本次新增：卡片底部可以點開看「所有區域」完整排行，樣式比照
+       整合地圖左側面板的 .side-section 摺疊區塊，但改用淺色卡片配色] */
+    .resource-chart-expand {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+    .resource-chart-expand summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      list-style: none;
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--forest-2);
+    }
+    .resource-chart-expand summary::-webkit-details-marker { display: none; }
+    .resource-chart-expand summary::after { content: "展開 ＋"; color: var(--ink-soft); font-size: .68rem; font-weight: 500; }
+    .resource-chart-expand[open] summary::after { content: "收合 −"; }
+    .resource-chart-bars-full {
+      margin-top: 16px;
+      max-height: 480px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
     .resource-chart-row {
       display: grid;
       grid-template-columns: 64px 1fr 68px;
@@ -401,6 +429,7 @@
 
     .resource-chart-bar.is-school i { background: linear-gradient(90deg, #8fd6e0, var(--teal)); }
     .resource-chart-bar.is-parking i { background: linear-gradient(90deg, #f0b6a4, var(--coral)); }
+    .resource-chart-bar.is-transit i { background: linear-gradient(90deg, #f5dfa0, #caa62e); }
 
     /* 托育疊圖：公立／私立各自實色，不用漸層，兩色皆已通過 dataviz 色盲／對比驗證 */
     .resource-chart-bar.is-childcare i.is-public { background: var(--forest-2); }
@@ -411,6 +440,64 @@
     .resource-chart-value { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
     .resource-chart-value small { margin-left: 2px; color: var(--ink-soft); font-size: .68rem; font-weight: 600; }
     /* ===== [改版新增：功能頁共用樣式結束] ===== */
+
+    /* ===== [本次改版：公共資源負擔力頁改成暗色版本] =====
+       配色沿用整合地圖左側浮動面板（.side-section）已經在用的深色語彙
+       （卡片 rgba(17,22,27,.94)、邊框 rgba(255,255,255,.14)、主文字 #f4f7f5、
+       次要文字 #aebcb7、長條底色 #242a2d），保持跟地圖頁一致的「深色 UI」語言，
+       不用另外發明一套新的深色配色。托育疊圖的公立／私立兩色改用 #0d9488／
+       #e0623f（已用 dataviz 驗證腳本在 --mode dark --surface #242a2d 下
+       ALL CHECKS PASS），淺色版原本的 --forest-2／--teal 在深色底上對比不足。 */
+    .resources-view {
+      /* [破格延伸：.page-container 有 max-width + margin:0 auto 置中，
+         深色背景如果只跟著 .page-container 的寬度走，兩側會露出網站
+         預設的白色 body 背景。用 100vw + 負 margin 讓背景延伸到整個
+         視窗寬度，再用等量 padding 把內容位置頂回原本置中的地方，
+         不用 position:fixed（上一版就是因為改成 fixed 尺寸才把頁面弄壞的）。] */
+      box-sizing: border-box;
+      width: 100vw;
+      min-height: 100vh;
+      margin-left: calc(50% - 50vw);
+      padding: 0 calc(50vw - 50%) 40px;
+      background: #0b0e14;
+    }
+
+    .resources-view .resource-page-title {
+      padding: 32px 0 8px;
+      color: #f4f7f5;
+      font-size: 30px;
+      font-weight: 700;
+    }
+
+    .resources-view .resource-chart-card {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(17,22,27,.94);
+      box-shadow: 0 16px 42px rgba(0,0,0,.32);
+    }
+
+    .resources-view .resource-chart-title h2 { color: #f4f7f5; }
+    .resources-view .resource-chart-title p { color: #aebcb7; }
+
+    .resources-view .resource-chart-legend { color: #aebcb7; }
+    .resources-view .resource-chart-legend li.is-public i { background: #0d9488; }
+    .resources-view .resource-chart-legend li.is-private i { background: #e0623f; }
+
+    .resources-view .resource-chart-status { color: #aebcb7; }
+    .resources-view .resource-chart-status.is-error { color: #ff8a65; }
+
+    .resources-view .resource-chart-label { color: #aebcb7; }
+    .resources-view .resource-chart-bar { background: #242a2d; }
+    .resources-view .resource-chart-row:hover .resource-chart-bar { background: #2c3336; }
+    .resources-view .resource-chart-bar.is-childcare i.is-public { background: #0d9488; }
+    .resources-view .resource-chart-bar.is-childcare i.is-private { background: #e0623f; }
+    .resources-view .resource-chart-bar.is-transit i { background: linear-gradient(90deg, #7a5c1e, #eab308); }
+    .resources-view .resource-chart-value { color: #f4f7f5; }
+    .resources-view .resource-chart-value small { color: #aebcb7; }
+
+    .resources-view .resource-chart-expand { border-top: 1px solid rgba(255,255,255,.14); }
+    .resources-view .resource-chart-expand summary { color: #55e6cf; }
+    .resources-view .resource-chart-expand summary::after { color: #aebcb7; }
+    /* ===== [本次改版：公共資源負擔力暗色版本結束] ===== */
 
     /* ===== [本次新增：組員既有 3D 地圖整合頁] ===== */
     .legacy-map-body { padding: 18px; }
@@ -479,6 +566,7 @@
       gap: 10px;
       width: 30%;
       height: calc(100vh - 30px);
+      padding-right: 10px;
       overflow: auto;
     }
 
