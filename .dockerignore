@@ -1,0 +1,42 @@
+# Build context is the repo root (see compose.yml `build.context: .`).
+# Keep it small: only frontend/ sources are actually needed by the Dockerfile.
+
+# VCS / CI
+.git
+.gitignore
+.github
+.openai
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+**/.DS_Store
+
+# Dependencies + build output are produced inside the image, never copied in
+**/node_modules
+dist
+frontend/dist
+
+# Never bake local secrets into the image
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Docs and container files that don't affect the build
+README.md
+backend/README.md
+frontend/README.md
+Dockerfile
+compose.yml
+.dockerignore
+
+# Logs / caches
+**/*.log
+**/npm-debug.log*
+**/.npm
+**/.cache
+**/.vite
