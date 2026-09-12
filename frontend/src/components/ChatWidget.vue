@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick, ref, watch } from "vue";
 import { appState } from "../store/appState.js";
+import { renderAssistantMarkdown } from "../lib/assistantMarkdown.js";
 import aiAvatar from "../assets/youth-ai-avatar.png";
 import userAvatar from "../assets/jerry-user-avatar.png";
 
@@ -80,9 +81,9 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
   <!-- ===== [Jerry 改版：右側手機型 AI 聊天室開始] ===== -->
   <Teleport to="body">
     <Transition name="chat-drawer">
-      <section v-if="appState.chatOpen" id="chat-panel" ref="chatPanelEl" tabindex="-1"
-               class="chat-panel" role="dialog" aria-labelledby="chat-title"
-               @keydown.esc="handleChatEscape">
+      <div v-if="appState.chatOpen" class="chat-shell" @keydown.esc.stop="handleChatEscape">
+        <section id="chat-panel" ref="chatPanelEl" tabindex="-1"
+                 class="chat-panel" role="dialog" aria-labelledby="chat-title">
         <header class="chat-header">
           <div class="chat-title-group">
             <strong id="chat-title">生活圈 AI 對話</strong>
@@ -102,22 +103,36 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
               <div class="chat-message-content">
                 <small class="chat-message-name">{{ message.role === "user" ? "USER" : "生活圈 AI 助理" }}</small>
                 <div class="message" :class="{ user: message.role === 'user' }">
-                  <!-- 散文一律走 {{ }}，由 Vue 轉義，永遠不會被當成 HTML 執行。
-                       v-if 是為了「只有圖表、沒有文字」的回覆不留一個空段落。 -->
-                  <p v-if="message.text">{{ message.text }}</p>
-                  <!-- [Jerry 2026-09-13 改版：圖表內容已在 lib/chartHtml.js 消毒；
-                       訊息內只留按鈕，真正圖表改在聊天室旁的大面板顯示。] -->
-                  <button v-for="(chart, chartIndex) in (message.charts || [])"
-                          :key="'chart-' + chartIndex" type="button" class="chat-plan-button"
-                          :aria-expanded="planChartKey === index + '-' + chartIndex"
-                          aria-controls="chat-plan-panel"
-                          :aria-label="'開啟規劃展示' + ((message.charts || []).length > 1 ? ' ' + (chartIndex + 1) : '')"
-                          @click="openPlanChart(chart, index + '-' + chartIndex, $event)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M4 19V9m6 10V5m6 14v-7m4 7H2"></path>
-                    </svg>
-                    <span>規劃展示</span>
-                  </button>
+                  <!-- 只有明確標記為 assistant 的回覆才解析 Markdown，且解析結果會先經
+                       DOMPurify 白名單消毒。user 與其他未知 role 一律走 {{ }} 純文字轉義。 -->
+                  <div v-if="message.role === 'assistant' && message.text"
+                       class="message-markdown" v-html="renderAssistantMarkdown(message.text)"></div>
+                  <p v-else-if="message.text">{{ message.text }}</p>
+                  <!-- [Jerry 2026-09-13 改版：只有 assistant 的已消毒圖表能進入展示流程；
+                       聊天氣泡內只留「規劃展示」按鈕，圖表本體在聊天室左側顯示。] -->
+                  <template v-if="message.role === 'assistant'">
+                    <button v-for="(chart, chartIndex) in (message.charts || [])"
+                            :key="'chart-' + chartIndex" type="button" class="chat-plan-button"
+                            :aria-expanded="planChartKey === index + '-' + chartIndex"
+                            aria-haspopup="dialog" aria-controls="chat-plan-panel"
+                            :aria-label="'開啟規劃展示' + ((message.charts || []).length > 1 ? ' ' + (chartIndex + 1) : '')"
+                            @click="openPlanChart(chart, index + '-' + chartIndex, $event)">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 19V9m6 10V5m6 14v-7m4 7H2"></path>
+                      </svg>
+                      <span>規劃展示</span>
+                    </button>
+                  </template>
+                  <!-- [2026-09-12 新增：這次回答讀了哪些資料。AI 是自己決定要查什麼的，
+                       把它的選擇攤開來，使用者才判斷得出數字可不可信。] -->
+                  <details v-if="message.tools && message.tools.length" class="chat-sources chat-tools">
+                    <summary>讀取的資料（{{ message.tools.length }}）</summary>
+                    <ol>
+                      <li v-for="(tool, toolIndex) in message.tools" :key="toolIndex">
+                        {{ tool.summary }}
+                      </li>
+                    </ol>
+                  </details>
                   <!-- [2026-09-12 新增：知識庫引用來源。S3 的 s3:// URI 在瀏覽器點不開，
                        所以只顯示檔名，避免給出一個按了沒反應的連結。] -->
                   <details v-if="message.sources && message.sources.length" class="chat-sources">
@@ -138,7 +153,9 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
                 <small class="chat-message-name">生活圈 AI 助理</small>
                 <div class="message typing-message">
                   <div class="typing-status">
-                    <span class="typing-label">回覆中</span>
+                    <!-- [2026-09-12 改版：AI 會先自己去查資料再回答，那段等待比單純
+                         生成長。顯示它正在讀什麼，等待才不像沒反應。] -->
+                    <span class="typing-label">{{ appState.chatActivity || "回覆中" }}</span>
                     <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
                   </div>
                 </div>
@@ -157,7 +174,8 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
             </button>
           </div>
         </footer>
-      </section>
+        </section>
+      </div>
     </Transition>
 
     <!-- [Jerry 2026-09-13 新增：桌面版位於聊天室左側；窄螢幕改為安全留邊的覆蓋面板。] -->
@@ -171,7 +189,9 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
             <strong id="chat-plan-title">規劃展示</strong>
           </div>
           <button type="button" class="chat-plan-close" aria-label="關閉規劃展示" @click="closePlanChart">
-            <span aria-hidden="true">×</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18"></path>
+            </svg>
           </button>
         </header>
         <!-- 圖表字串已由 chartHtml.js 的 DOMPurify 白名單處理。 -->

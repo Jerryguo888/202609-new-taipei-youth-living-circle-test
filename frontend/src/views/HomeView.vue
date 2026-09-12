@@ -14,8 +14,7 @@ const heroImageUrl = new URL("assets/new-taipei-living-circle-hero.png", documen
         <!-- <div class="home-kicker"><i></i>NEW TAIPEI · YOUTH FUTURES</div> -->
         <h1 class="home-title">看見青年<span>讓城市先準備</span></h1>
         <p class="home-description">
-          預測青年未來 1～3 年往哪裡移動與成家，提前看見公共服務缺口，
-          再把職涯服務放到 30 分鐘內真正到得了的位置。
+          預測青年未來 1～3 年往哪裡移動與成家，提前看見公共服務缺口，並結合 AI Agent 獲得進一步的資訊。
         </p>
         <div class="home-actions">
           <button class="home-launch-button" @click="appState.go('combined')">進入整合地圖 <span>→</span></button>

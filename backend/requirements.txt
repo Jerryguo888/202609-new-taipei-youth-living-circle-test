@@ -4,3 +4,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 boto3==1.43.93
 pydantic==2.10.4
+# 讀 data_sources.yaml：資料目錄同時給季度作業和 list_available_data 工具使用
+PyYAML==6.0.2
+# 後台上傳知識庫檔案需要 multipart 表單解析（FastAPI 的 UploadFile 依賴它）
+python-multipart==0.0.20

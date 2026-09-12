@@ -1,0 +1,165 @@
+# 資料來源清單（取代原本的 backend/api_list.txt 純網址列表）
+#
+# 這份檔案是「哪些資料存在、從哪來、多久更新一次、進到哪裡」的單一事實來源。
+# 兩個地方會讀它：
+#   - 季度更新作業：決定要抓哪些 API
+#   - tools.py 的 list_available_data：讓 AI 知道自己有哪些資料可用
+#
+# fetch 欄位的意義：
+#   api    有 JSON API，季度作業可以自動抓
+#   manual 沒有可用 API，需要人工匯出後上傳到 KB（見 kb_prefix）
+#
+# destination：
+#   athena  進 curated 層（S3 + Glue），供 query_metrics 與 lookup_records 查詢
+#   kb      進 Bedrock 知識庫，供 search_documents 語意檢索
+#
+# 【分工原則】API 來源的資料一律只進 athena，不進 KB。
+#
+# 理由不是為了省錢，是為了正確性：名冊類資料（機構、地址、電話、時段）是結構化的，
+# 用向量檢索問「板橋區有哪些托育中心」會因為比的是語意相似度而混進其他行政區的
+# 片段；而地址電話經過 embedding 再讓模型重述，是最容易出現幻覺的地方。
+# 這類查詢走 lookup_records 的 `WHERE district = ?` 才精確。
+#
+# 因此 KB 只留「人工上傳的文件」：主計處統計報表、政策說明這類真的需要語意檢索的
+# 長文。這也讓 KB 保持很小，同步快、成本低。
+#
+# 兩個 bucket：KB 用既有的 bucket（已在 AWS-s3-KB-Test 跑通，不要動），
+# 資料湖另開一個放 raw/、curated/、athena-results/。分開是為了讓「KB 誤吃
+# Parquet」這件事結構上不可能發生。
+
+version: 1
+
+# 我們多久去打一次 API（.github/workflows/refresh-data.yml 的排程）。
+# 這跟下面每個資料集的 cadence 是兩件事：cadence 描述「來源自己多久變一次」，
+# 這裡描述「我們多久去看一次」。每月輪詢一個季更新的來源不會壞，只是多數月份
+# 抓到的內容跟上次一樣。
+poll_schedule: monthly
+
+# 季度批次的基準日；驗證關卡會比對 snapshot 是否推進
+snapshot_format: "YYYY-QN"
+
+datasets:
+  - id: ntpc-population-age
+    name: 現住人口之年齡分配
+    fetch: api
+    url: https://data.ntpc.gov.tw/api/datasets/8308ab58-62d1-424e-8314-24b65b7ab492/json?page=0&size=10000
+    portal_page: https://data.ntpc.gov.tw/datasets/8308AB58-62D1-424E-8314-24B65B7AB492
+    cadence: yearly
+    destination: [athena]
+    athena_table: population_age
+    # ⚠ 這份資料的欄位名是 field1 + percent2~percent33，完全看不出對應哪個年齡層。
+    # field1 形如「2000年 新北市0 計」（年份＋行政區＋類別），percent2 看起來是總計，
+    # percent3 之後推測是 5 歲一組，但「這只是推測，尚未向來源確認」。
+    # 這份是全站青年人口數字的源頭，欄位對錯一格所有數字都會偏移且不會報錯，
+    # 所以 transform 必須寫死明確對應表，並用「各年齡層加總 == percent2」當驗證條件，
+    # 對不上就讓季度作業失敗，不要放進 curated。
+    schema_risk: high
+    notes: >
+      目前 app 實際使用的是組員已經整理好的
+      frontend/public/data/3d_map/新北市20至34歲人數.csv，
+      欄位對應確認之前先以那份為準，不要直接改用這支 API 的原始欄位。
+
+  - id: ntpc-childcare-public
+    name: 新北市公共托育中心名冊
+    fetch: api
+    url: https://data.ntpc.gov.tw/api/datasets/b3faf2aa-e96b-4f2f-b647-da47dc094860/json?page=0&size=10000
+    cadence: quarterly
+    destination: [athena]
+    athena_table: childcare_facilities
+    fields: [no, name, unit, county, town, address, localcallservice]
+
+  - id: ntpc-childcare-private
+    name: 新北市私立托嬰機構名冊
+    fetch: api
+    url: https://data.ntpc.gov.tw/api/datasets/69cecdb0-7796-48df-84e5-99e4f1274245/json?page=0&size=10000
+    cadence: quarterly
+    destination: [athena]
+    athena_table: childcare_facilities
+    # person 是核定收托人數，是唯一帶容額的來源，缺口計算會用到
+    fields: [no, title, county, area, address, localcallservice, person]
+
+  - id: ntpc-vaccine-clinics
+    name: 疫苗接種院所名冊
+    fetch: api
+    url: https://data.ntpc.gov.tw/api/datasets/551cd3f4-534a-45cf-976a-359090fb7df6/json?page=0&size=10000
+    cadence: quarterly
+    destination: [athena]
+    athena_table: vaccine_clinics
+    fields: [name, "telephone number", address, type, remark, reservation, own_expense]
+
+  - id: ntpc-vaccine-schedules
+    name: 各區衛生所接種時段
+    fetch: api
+    url: https://data.ntpc.gov.tw/api/datasets/781ed216-be0d-4a31-a3e3-bc8f6fe2b221/json?page=0&size=10000
+    cadence: quarterly
+    destination: [athena]
+    athena_table: vaccine_schedules
+    # 內容是文字時段描述（「週一至週五上午8:30~11:30」），做不了數值彙總，
+    # 但它是結構化的逐筆資料，走 lookup_records 比語意檢索精確
+    fields: [seqno, district, vaccine, bcg, remark, date]
+
+  - id: ntpc-youbike
+    name: 新北市公共自行車租賃系統（YouBike 2.0）
+    fetch: api
+    url: https://data.ntpc.gov.tw/api/datasets/010e5b15-3823-4b20-b401-b1cf000550c5/json?page=0&size=10000
+    # ⚠ 這是即時資料：sbi_quantity 是當下可借車輛、bemp 是空位、mday 是時間戳。
+    # 季更新會讓即時欄位完全失去意義，所以拆成兩個用途：
+    #   靜態（站點位置、總柱數 tot_quantity）走季度 → athena
+    #   即時（sbi_quantity、bemp）如果要用，另開高頻排程，不要混進季度快照
+    cadence: realtime
+    quarterly_subset: [sno, sna, sarea, ar, lat, lng, tot_quantity]
+    destination: [athena]
+    athena_table: youbike_stations
+    fields: [scity, sna, sarea, ar, sno, tot_quantity, sbi_quantity, bemp, mday, lat, lng, act]
+
+  - id: moi-parent-child-centers
+    name: 新北市公共親子中心
+    fetch: api
+    # 不同平台（data.gov.tw），回傳格式與 data.ntpc.gov.tw 不同，需要獨立 adapter
+    url: https://data.gov.tw/dataset/123449
+    portal: data.gov.tw
+    cadence: quarterly
+    destination: [athena]
+    athena_table: parent_child_centers
+    adapter: datagovtw
+
+  - id: ntpc-vaccination-counts
+    name: 新北市接種數依預防接種完成類別分
+    # 主計處 statfile 是 ASP.NET 頁面，沒有 JSON API。
+    # 這是整條自動化唯一無法乾淨排程的一環：接受人工季度匯出，
+    # 或寫爬蟲（頁面改版就會斷）。目前選人工。
+    fetch: manual
+    url: https://oas.bas.ntpc.gov.tw/DgbasWeb/Page/statfile4.aspx?Period=%u91ab%u7642%u9662%u6240%2c%u9810%u9632%u63a5%u7a2e%2c%u8b77%u58eb%2c%u5e8a%u4f4d
+    cadence: quarterly
+    destination: [kb]
+    kb_prefix: kb/docs/vaccination-stats/
+    manual_steps: >
+      每季從上面的頁面匯出報表，另存為 CSV 或 PDF，
+      上傳到 s3://<bucket>/kb/docs/vaccination-stats/<YYYY-QN>/，
+      然後對知識庫執行一次 StartIngestionJob。
+
+  - id: ntpc-vaccination-eligible
+    name: 新北市「應」接種數依預防接種完成類別分
+    fetch: manual
+    url: https://oas.bas.ntpc.gov.tw/DgbasWeb/Page/statfile4.aspx?Period=%u91ab%u7642%u9662%u6240%2c%u9810%u9632%u63a5%u7a2e%2c%u8b77%u58eb%2c%u5e8a%u4f4d
+    cadence: quarterly
+    destination: [kb]
+    kb_prefix: kb/docs/vaccination-stats/
+    manual_steps: 同 ntpc-vaccination-counts，兩份一起匯出上傳。
+
+  - id: ntpc-mortality
+    name: 新北市死因統計（97-114）
+    fetch: manual
+    cadence: yearly
+    destination: [athena]
+    athena_table: mortality_statistics
+    notes: >
+      目前使用 frontend/public/data/raw/新北市死因統計97-114.csv，
+      用來計算 20~29 歲自殺死亡占同齡全部死亡的比例。
+
+# 交通類資料（公車站牌、捷運站序班距）目前是靜態 CSV，來源為 TDX 與台北市資料大平臺。
+# 它們變動極慢且已經整理過，這一輪先不納入季度作業，維持前端直讀。
+static_datasets:
+  - { id: ntpc-bus, name: 新北市公車站牌與路線, files: [ntpc_bus_stops_full.csv, ntpc_bus_routes_full.csv] }
+  - { id: taipei-metro, name: 台北捷運站點/站序/班距/轉乘, source: 台北市資料大平臺 }
+  - { id: ntmc-metro, name: 新北環狀線站點/站序/班距, source: TDX }

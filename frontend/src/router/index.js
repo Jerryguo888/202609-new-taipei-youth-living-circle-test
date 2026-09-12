@@ -11,6 +11,10 @@ export const router = createRouter({
     { path: "/", name: "home", component: () => import("../views/HomeView.vue") },
     { path: "/combined", name: "combined", component: () => import("../views/PopulationMapView.vue") },
     { path: "/resources", name: "resources", component: () => import("../views/ResourcesView.vue") },
+    /* [2026-09-12 新增：後台。刻意不放進 NavOrb 選單 —— 一般使用者不需要看到入口。
+       這條路由本身不是安全邊界：畫面會先問後端有沒有有效的工作階段，
+       而所有資料與操作都由後端逐一驗證權限。知道網址不等於有權限。 */
+    { path: "/admin", name: "admin", component: () => import("../views/AdminView.vue") },
     /* [本次改版：3D人口／30分鐘交通／預算模擬／青年熱區被刪掉了，舊書籤網址
        （#/map3d、#/transit、#/budget、#/forecast）不要留白頁，導回首頁。] */
     { path: "/:pathMatch(.*)*", redirect: "/" },
