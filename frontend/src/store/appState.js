@@ -27,6 +27,7 @@ import {
 } from "../lib/mapLibreMap.js";
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
 import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
+import { estimateTransitGapRows } from "../lib/transitGap.js";
 import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
 
 const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—" };
@@ -53,6 +54,8 @@ export const appState = reactive({
       unit: "%",
       metricLabel: "稀缺率",
       copy: "各行政區公共托育稀缺率（依機構數與20~29歲青年人口推估，公立／私立分開疊圖）",
+      /* [本次新增：點開卡片會跳出跟死因統計一樣的 modal，footer 用這行公式說明] */
+      formula: "稀缺率＝機構缺口（公立＋私立）÷ 應有機構總數 × 100",
       rows: [],
     },
     /* [本次新增：交通稀缺率＝(需求標準化分數－供給標準化分數)／需求標準化分數×100，
@@ -63,6 +66,7 @@ export const appState = reactive({
       unit: "%",
       metricLabel: "稀缺率",
       copy: "各行政區交通稀缺率（需求標準化分數與供給標準化分數的落差；需求為20~29歲人口，供給為30分鐘平均可達站數）",
+      formula: "稀缺率＝(需求標準化分數－供給標準化分數) ÷ 需求標準化分數 × 100",
       rows: [],
     },
   },
@@ -73,6 +77,11 @@ export const appState = reactive({
   childcareGapLoaded: false,
   childcareGapLoading: false,
   childcareGapStatus: "托育缺口資料待載入",
+  /* [本次新增：交通稀缺率也是非同步估算（需要先載入公車／捷運路網並跑可達性抽樣），
+     用同一套載入狀態旗標的命名慣例] */
+  transitGapLoaded: false,
+  transitGapLoading: false,
+  transitGapStatus: "交通稀缺率資料待載入",
   /* [本次新增：死因統計使用獨立狀態，不影響既有托育缺口資料與錯誤處理] */
   mortalityLoaded: false,
   mortalityLoading: false,
@@ -156,10 +165,19 @@ export const appState = reactive({
         unit: category.unit,
         metricLabel: category.metricLabel,
         copy: category.copy,
+        formula: category.formula,
         rows: sorted.slice(0, 5).map(mapRow),
         allRows: sorted.map(mapRow),
       };
     }, this);
+  },
+  /* [本次新增：每一類資源缺口各自非同步載入，卡片要顯示各自的載入中／失敗訊息，
+     用這個小 map 讓 ResourcesView.vue 不用針對每個 key 各寫一次 if/else] */
+  get resourceGapLoadingInfo() {
+    return {
+      childcare: { loading: this.childcareGapLoading, status: this.childcareGapStatus },
+      transit: { loading: this.transitGapLoading, status: this.transitGapStatus },
+    };
   },
   /* [本次新增：完整排行保留在 mortalityRows，首頁卡片只取排序後前五名] */
   get mortalityTop5Rows() {
@@ -250,6 +268,25 @@ export const appState = reactive({
       this.childcareGapStatus = "資料載入失敗。" + dataLoadHint();
     } finally {
       this.childcareGapLoading = false;
+    }
+  },
+  /* [本次新增：交通稀缺率也非同步估算；會連帶觸發公車／捷運路網載入與
+     30 分鐘可達性抽樣（跟整合地圖共用同一份模組級快取，不會重算兩次），
+     首次進資源缺口頁可能要等一下，所以一樣有自己的載入狀態文字。] */
+  async loadTransitGapData() {
+    if (this.transitGapLoaded || this.transitGapLoading) return;
+    this.transitGapLoading = true;
+    this.transitGapStatus = "讀取路網與可達性資料…";
+    try {
+      const rows = await estimateTransitGapRows();
+      this.resourceGaps.transit.rows = rows;
+      this.transitGapLoaded = true;
+      this.transitGapStatus = "";
+    } catch (error) {
+      console.error(error);
+      this.transitGapStatus = "資料載入失敗。" + dataLoadHint();
+    } finally {
+      this.transitGapLoading = false;
     }
   },
   /* [本次新增：死因統計獨立載入；失敗時不會清空或遮蔽既有托育圖表] */
@@ -364,7 +401,10 @@ export async function ensureViewReady(view) {
     ensureIntegratedTransitLayers();
     setIntegratedTransitVisibility(appState.showTransitStops);
   } else if (view === "resources") {
-    await appState.loadResourceGapData();
-    await appState.loadMortalityData();
+    await Promise.all([
+      appState.loadResourceGapData(),
+      appState.loadTransitGapData(),
+      appState.loadMortalityData(),
+    ]);
   }
 }

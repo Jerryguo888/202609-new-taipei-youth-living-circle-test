@@ -25,4 +25,6 @@ export const DATA_FILES = {
   childcareInstitutions: "data/raw/新北市托嬰機構數量統計.csv",
   /* [本次新增：各行政區死因統計，用來計算20~29歲自殺死亡占同齡全部死亡的比例] */
   mortalityStatistics: "data/raw/新北市死因統計97-114.csv",
+  /* [Jerry 新增：官方 YouBike2.0 全市站點快照；GitHub Pages 不直連 HTTP 私人主機] */
+  youbikeSnapshot: "data/raw/ntpc_youbike_realtime.json",
 };
