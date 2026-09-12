@@ -287,6 +287,21 @@
       opacity: .75;
     }
 
+    /* [Jerry 修正：公共資源頁標題原本的 width:100% 會把右側說明推出畫面；
+       只在綠色資源頁橫幅補上可收縮欄位與內距，不影響整合地圖。] */
+    .module-hero.green {
+      min-height: 190px;
+      padding: clamp(30px, 4vw, 58px);
+    }
+
+    .module-hero.green > div {
+      width: auto;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .module-hero.green > p { flex: 0 1 420px; }
+
     .module-body {
       padding: 22px 0 80px;
     }
@@ -325,6 +340,234 @@
       background: var(--forest-2);
       content: "";
     }
+
+    /* ===== [Jerry 新增：YouBike 公共資源面板開始] =====
+       依使用者草圖：黑色外框、左上到右下 2x2 指標卡、下方一張全寬排行卡。 */
+    .youbike-board {
+      width: min(100%, 920px);
+      margin: 0 auto 30px;
+      padding: clamp(18px, 3vw, 34px);
+      border-radius: 34px;
+      background: #111312;
+      color: #f6f8f5;
+      box-shadow: 0 26px 70px rgba(17, 19, 18, .18);
+    }
+
+    .youbike-board-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+      padding: 0 4px;
+    }
+
+    .youbike-wordmark {
+      margin: 0 0 8px;
+      color: #f6f8f5;
+      font-size: .78rem;
+      font-weight: 900;
+      letter-spacing: -.04em;
+      text-transform: lowercase;
+    }
+
+    .youbike-wordmark span { color: #f4bf22; }
+
+    .youbike-board-head h2 {
+      margin: 0;
+      font-size: clamp(1.25rem, 2.4vw, 1.9rem);
+      font-weight: 780;
+      letter-spacing: -.045em;
+    }
+
+    .youbike-data-time {
+      display: grid;
+      gap: 3px;
+      margin: 0;
+      color: #c2cbc6;
+      font-size: .72rem;
+      line-height: 1.45;
+      text-align: right;
+    }
+
+    .youbike-data-time span { color: #7f8b85; font-variant-numeric: tabular-nums; }
+
+    .youbike-error {
+      margin: 0 0 12px;
+      padding: 11px 13px;
+      border: 1px solid rgba(238, 128, 98, .36);
+      border-radius: 12px;
+      background: rgba(238, 128, 98, .12);
+      color: #ffc7b7;
+      font-size: .78rem;
+    }
+
+    .youbike-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .youbike-stat-card {
+      position: relative;
+      min-height: 150px;
+      overflow: hidden;
+      padding: clamp(18px, 3vw, 28px);
+      border-radius: 25px;
+      background: #eef0ed;
+      color: #171a18;
+    }
+
+    .youbike-stat-card::after {
+      position: absolute;
+      right: -22px;
+      bottom: -32px;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: rgba(24, 87, 47, .07);
+      content: "";
+    }
+
+    .youbike-stat-card.is-empty::after { background: rgba(213, 80, 50, .08); }
+
+    .youbike-stat-card p {
+      margin: 0 0 22px;
+      color: #5f6964;
+      font-size: .78rem;
+      font-weight: 760;
+      letter-spacing: .04em;
+    }
+
+    .youbike-stat-card strong {
+      position: relative;
+      z-index: 1;
+      font-size: clamp(2rem, 5vw, 3.7rem);
+      font-weight: 780;
+      letter-spacing: -.065em;
+      line-height: .86;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-stat-card > span {
+      position: relative;
+      z-index: 1;
+      margin-left: 7px;
+      color: #6d7772;
+      font-size: .72rem;
+      font-weight: 700;
+    }
+
+    .youbike-stat-grid.is-loading .youbike-stat-card {
+      background: linear-gradient(105deg, #e4e7e3 22%, #f1f3f0 38%, #e4e7e3 56%);
+      background-size: 220% 100%;
+      animation: youbike-loading 1.3s linear infinite;
+    }
+
+    .youbike-ranking-card {
+      margin-top: 12px;
+      padding: clamp(18px, 3vw, 30px);
+      border-radius: 25px;
+      background: #eef0ed;
+      color: #171a18;
+    }
+
+    .youbike-ranking-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .youbike-ranking-head p {
+      margin: 0 0 5px;
+      color: #68736d;
+      font-size: .68rem;
+      font-weight: 820;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .youbike-ranking-head h3 {
+      margin: 0;
+      font-size: clamp(1rem, 2vw, 1.35rem);
+      letter-spacing: -.025em;
+    }
+
+    .youbike-ranking-head > span {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: #dce2de;
+      color: #56615b;
+      font-size: .68rem;
+      font-weight: 760;
+    }
+
+    .youbike-ranking-list {
+      display: grid;
+      gap: 14px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .youbike-ranking-list li {
+      display: grid;
+      grid-template-columns: 28px 64px minmax(90px, 1fr) 58px;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .youbike-ranking-index {
+      color: #8a938e;
+      font-size: .7rem;
+      font-weight: 820;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-ranking-list li > strong { font-size: .78rem; }
+
+    .youbike-ranking-track {
+      height: 11px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #d9dedb;
+    }
+
+    .youbike-ranking-track i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: #1c5f38;
+      transition: width .35s ease;
+    }
+
+    .youbike-ranking-list b {
+      text-align: right;
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-ranking-list b small {
+      margin-left: 3px;
+      color: #6d7772;
+      font-size: .65rem;
+    }
+
+    .youbike-ranking-empty {
+      margin: 0;
+      padding: 24px 0;
+      color: #747e79;
+      font-size: .78rem;
+      text-align: center;
+    }
+
+    @keyframes youbike-loading {
+      to { background-position: -220% 0; }
+    }
+    /* ===== [Jerry 新增：YouBike 公共資源面板結束] ===== */
 
     /* ===== [本次改版：資源缺口頁只剩托育一張稀缺率疊圖（學校／停車已刪除），
        改成單欄置中，卡片限制最大寬度避免長條圖被拉得過寬] ===== */
@@ -763,9 +1006,28 @@
       .resource-chart-grid { max-width: none; }
       .resource-chart-row { grid-template-columns: 56px 1fr 60px; }
       .module-hero { align-items: flex-start; flex-direction: column; }
+      .module-hero.green { min-height: 0; gap: 16px; padding: 30px 22px; }
+      .module-hero.green > div { width: 100%; font-size: 22px; }
+      .module-hero.green h1 { margin: 0; font-size: clamp(2.35rem, 12vw, 3.7rem); }
+      .module-hero.green > p { flex: none; font-size: .85rem; }
       .legacy-map-body { padding: 10px; }
       .population-3d-stage { min-height: 70vh; }
       .population-3d-stage.with-transit { height: 86vh; min-height: 720px; }
       .map-side-panel { left: 10px; width: calc(100% - 20px); max-height: calc(100% - 210px); }
       .chat-panel { right: 10px; bottom: 10px; left: 10px; width: auto; }
+    }
+
+    @media (max-width: 520px) {
+      /* [Jerry 新增：YouBike 面板手機版仍維持草圖指定的 2x2 排列] */
+      .youbike-board { padding: 14px; border-radius: 25px; }
+      .youbike-board-head { align-items: flex-start; flex-direction: column; gap: 10px; }
+      .youbike-data-time { text-align: left; }
+      .youbike-stat-grid { gap: 9px; }
+      .youbike-stat-card { min-height: 118px; padding: 16px 14px; border-radius: 19px; }
+      .youbike-stat-card p { margin-bottom: 17px; }
+      .youbike-stat-card strong { font-size: clamp(1.65rem, 9vw, 2.35rem); }
+      .youbike-stat-card > span { display: block; margin: 7px 0 0; }
+      .youbike-ranking-card { margin-top: 9px; padding: 18px 14px; border-radius: 19px; }
+      .youbike-ranking-head { align-items: flex-start; flex-direction: column; gap: 9px; }
+      .youbike-ranking-list li { grid-template-columns: 22px 54px minmax(60px, 1fr) 48px; gap: 7px; }
     }
