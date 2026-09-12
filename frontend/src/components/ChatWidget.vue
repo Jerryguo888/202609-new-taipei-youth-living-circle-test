@@ -9,16 +9,50 @@ const messagesEl = ref(null);
 const chatPanelEl = ref(null);
 const chatInputEl = ref(null);
 const chatLauncherEl = ref(null);
+const chartModalEl = ref(null);
+const chartModalCloseEl = ref(null);
+const expandedChartHtml = ref("");
+let chartReturnFocusEl = null;
 
 function handleSend() {
   appState.sendChat(messagesEl.value);
 }
 
 function closeChat() {
+  expandedChartHtml.value = "";
+  chartReturnFocusEl = null;
   appState.chatOpen = false;
   nextTick(function () {
     chatLauncherEl.value?.focus();
   });
+}
+
+async function openChartModal(chart, event) {
+  if (!chart) return;
+  chartReturnFocusEl = event?.currentTarget || null;
+  expandedChartHtml.value = chart;
+  await nextTick();
+  chartModalEl.value?.focus();
+}
+
+function closeChartModal() {
+  const returnTarget = chartReturnFocusEl;
+  expandedChartHtml.value = "";
+  chartReturnFocusEl = null;
+  nextTick(function () {
+    returnTarget?.focus();
+  });
+}
+
+function handleChatEscape() {
+  if (expandedChartHtml.value) closeChartModal();
+  else closeChat();
+}
+
+function keepChartModalFocus(event) {
+  if (event.key !== "Tab") return;
+  event.preventDefault();
+  chartModalCloseEl.value?.focus();
 }
 
 /* [2026-09-12 新增：知識庫來源是 s3://bucket/key，只取檔名顯示比較好讀。] */
@@ -46,9 +80,9 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
   <!-- ===== [Jerry 改版：右側手機型 AI 聊天室開始] ===== -->
   <Teleport to="body">
     <Transition name="chat-drawer">
-      <section v-if="appState.chatOpen" id="chat-panel" ref="chatPanelEl" tabindex="-1"
-               class="chat-panel" role="dialog" aria-labelledby="chat-title"
-               @keydown.esc="closeChat">
+      <div v-if="appState.chatOpen" class="chat-shell" @keydown.esc.stop="handleChatEscape">
+        <section id="chat-panel" ref="chatPanelEl" tabindex="-1"
+                 class="chat-panel" role="dialog" aria-labelledby="chat-title">
         <header class="chat-header">
           <div class="chat-title-group">
             <strong id="chat-title">生活圈 AI 對話</strong>
@@ -73,14 +107,21 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
                   <div v-if="message.role === 'assistant' && message.text"
                        class="message-markdown" v-html="renderAssistantMarkdown(message.text)"></div>
                   <p v-else-if="message.text">{{ message.text }}</p>
-                  <!-- [2026-09-12 新增：模型畫的圖表。
-                       這是另一種只屬於 AI 回覆的 v-html。內容已在 lib/chartHtml.js
-                       以 DOMPurify 白名單消毒：只留規定的標籤與 class，style 僅允許
-                       width 百分比。模型讀得到 S3 知識庫，而知識庫內容屬於不可信
-                       輸入（可能被塞提示注入），所以這道消毒不能省。 -->
+                  <!-- 只有 assistant 的已消毒 chart HTML 能進入預覽與放大流程；
+                       user 訊息即使帶有 charts 欄位也不會執行 v-html。 -->
                   <template v-if="message.role === 'assistant'">
                     <div v-for="(chart, chartIndex) in (message.charts || [])"
-                         :key="'chart-' + chartIndex" class="ai-chart-wrap" v-html="chart"></div>
+                         :key="'chart-' + chartIndex" class="ai-chart-preview">
+                      <div class="ai-chart-wrap" v-html="chart"></div>
+                      <button type="button" class="ai-chart-expand-button"
+                              aria-haspopup="dialog" aria-controls="ai-chart-modal"
+                              @click="openChartModal(chart, $event)">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"></path>
+                        </svg>
+                        <span>放大查看圖表</span>
+                      </button>
+                    </div>
                   </template>
                   <!-- [2026-09-12 新增：這次回答讀了哪些資料。AI 是自己決定要查什麼的，
                        把它的選擇攤開來，使用者才判斷得出數字可不可信。] -->
@@ -133,8 +174,33 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
             </button>
           </div>
         </footer>
-      </section>
+        </section>
+      </div>
     </Transition>
+
+    <Transition name="chart-modal">
+      <div v-if="appState.chatOpen && expandedChartHtml" class="chat-chart-modal-backdrop"
+           @click.self="closeChartModal" @keydown.esc.stop="closeChartModal">
+        <section id="ai-chart-modal" ref="chartModalEl" tabindex="-1"
+                 class="chat-chart-modal" role="dialog" aria-modal="true"
+                 aria-labelledby="ai-chart-modal-title" @keydown="keepChartModalFocus">
+          <header class="chat-chart-modal-header">
+            <strong id="ai-chart-modal-title">圖表放大檢視</strong>
+            <button ref="chartModalCloseEl" type="button" class="chart-collapse-button"
+                    @click="closeChartModal" aria-label="關閉放大圖表">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18"></path>
+              </svg>
+              <span>關閉圖表</span>
+            </button>
+          </header>
+          <div class="chat-chart-modal-body">
+            <div class="ai-chart-wrap" v-html="expandedChartHtml"></div>
+          </div>
+        </section>
+      </div>
+    </Transition>
+
   </Teleport>
 
   <!-- [Jerry 2026-09-13 新增：AI 圓形按鈕上方的常駐提示泡泡；聊天室開啟後一起收起。] -->
