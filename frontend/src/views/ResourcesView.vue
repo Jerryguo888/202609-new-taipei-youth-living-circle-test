@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { appState } from "../store/appState.js";
 import MortalityBarRows from "../components/MortalityBarRows.vue";
 import { loadYouBikeDashboard } from "../lib/youbike.js";
@@ -12,7 +12,7 @@ const youbikeData = ref({
   totalDocks: 0,
   availableBikes: 0,
   zeroBikeStations: 0,
-  zeroStations: [],
+  allZeroDistricts: [],
   topZeroDistricts: [],
   updatedAt: "",
   isSnapshot: true,
@@ -27,42 +27,27 @@ const youbikeStats = computed(function () {
   ];
 });
 
-/* ===== [Jerry 新增：全部零車站右側面板開始] ===== */
-const zeroStationPanelOpen = ref(false);
-const zeroStationPanelExpanded = ref(false);
-const zeroStationSearch = ref("");
-const zeroStationPanel = ref(null);
-const zeroStationList = ref(null);
+/* ===== [Jerry 修正：零車「行政區排行」放大面板開始] ===== */
+const zeroDistrictPanelOpen = ref(false);
+const zeroDistrictPanelExpanded = ref(false);
+const zeroDistrictPanel = ref(null);
+const zeroDistrictTrigger = ref(null);
 
-const filteredZeroStations = computed(function () {
-  const keyword = zeroStationSearch.value.trim().toLocaleLowerCase("zh-Hant");
-  if (!keyword) return youbikeData.value.zeroStations;
-  return youbikeData.value.zeroStations.filter(function (station) {
-    return [station.district, station.name, station.address].some(function (value) {
-      return String(value).toLocaleLowerCase("zh-Hant").includes(keyword);
-    });
-  });
-});
-
-/* [Jerry 修正：清單捲到底後再搜尋時，要回到搜尋結果第一筆，不能停在舊捲動位置。] */
-watch(zeroStationSearch, async function () {
-  await nextTick();
-  if (zeroStationList.value) zeroStationList.value.scrollTop = 0;
-});
-
-async function openZeroStationPanel() {
+async function openZeroDistrictPanel() {
   if (youbikeLoading.value || youbikeError.value) return;
-  zeroStationPanelOpen.value = true;
+  zeroDistrictPanelOpen.value = true;
   document.body.classList.add("has-youbike-zero-panel");
   await nextTick();
-  zeroStationPanel.value?.focus();
+  zeroDistrictPanel.value?.focus();
 }
 
-function closeZeroStationPanel() {
-  zeroStationPanelOpen.value = false;
-  zeroStationPanelExpanded.value = false;
-  zeroStationSearch.value = "";
+function closeZeroDistrictPanel() {
+  zeroDistrictPanelOpen.value = false;
+  zeroDistrictPanelExpanded.value = false;
   document.body.classList.remove("has-youbike-zero-panel");
+  nextTick(function () {
+    zeroDistrictTrigger.value?.focus();
+  });
 }
 
 onMounted(async function () {
@@ -75,7 +60,7 @@ onMounted(async function () {
     youbikeLoading.value = false;
   }
 });
-/* ===== [Jerry 新增：全部零車站右側面板結束] ===== */
+/* ===== [Jerry 修正：零車「行政區排行」放大面板結束] ===== */
 
 /* [保留組員最新版：青年健康指標 dialog 開關與焦點還原] */
 const mortalityDialog = ref(null);
@@ -109,7 +94,7 @@ function handleMortalityBackdropClick(event) {
 }
 
 onBeforeUnmount(function () {
-  closeZeroStationPanel();
+  closeZeroDistrictPanel();
   if (mortalityDialog.value && mortalityDialog.value.open) mortalityDialog.value.close();
   document.body.style.overflow = previousBodyOverflow;
 });
@@ -141,28 +126,25 @@ onBeforeUnmount(function () {
         <p v-if="youbikeError" class="youbike-error" role="alert">{{ youbikeError }}</p>
 
         <div class="youbike-stat-grid" :class="{ 'is-loading': youbikeLoading }">
-          <component v-for="stat in youbikeStats" :key="stat.key"
-                     :is="stat.key === 'empty' ? 'button' : 'article'"
-                     :type="stat.key === 'empty' ? 'button' : null"
+          <article v-for="stat in youbikeStats" :key="stat.key"
                      class="youbike-stat-card"
-                     :class="['is-' + stat.key, { 'is-action': stat.key === 'empty' }]"
-                     :aria-haspopup="stat.key === 'empty' ? 'dialog' : null"
-                     :aria-expanded="stat.key === 'empty' ? zeroStationPanelOpen : null"
-                     @click="stat.key === 'empty' && openZeroStationPanel()">
+                     :class="'is-' + stat.key">
             <p>{{ stat.label }}</p>
             <strong>{{ youbikeLoading ? "—" : stat.value.toLocaleString("zh-TW") }}</strong>
             <span class="youbike-stat-unit">{{ stat.unit }}</span>
-            <small v-if="stat.key === 'empty'" class="youbike-stat-open-hint">查看所有地點 <b>→</b></small>
-          </component>
+          </article>
         </div>
 
-        <article class="youbike-ranking-card">
+        <!-- [Jerry 修正：點擊的是行政區 Top 5 排行卡，不是上方「無車可借站」數字卡。] -->
+        <button ref="zeroDistrictTrigger" type="button" class="youbike-ranking-card is-action"
+                aria-haspopup="dialog" :aria-expanded="zeroDistrictPanelOpen"
+                @click="openZeroDistrictPanel">
           <div class="youbike-ranking-head">
             <div>
               <p>調度優先觀察</p>
               <h3>無車可借場站數前五區</h3>
             </div>
-            <span>可借車輛 = 0</span>
+            <span>可借車輛 = 0 · 查看完整排行 ↗</span>
           </div>
           <ol v-if="!youbikeLoading && youbikeData.topZeroDistricts.length" class="youbike-ranking-list">
             <li v-for="(row, index) in youbikeData.topZeroDistricts" :key="row.district">
@@ -175,52 +157,50 @@ onBeforeUnmount(function () {
             </li>
           </ol>
           <p v-else class="youbike-ranking-empty">{{ youbikeLoading ? "正在統計 29 區站點…" : "目前沒有排行資料" }}</p>
-        </article>
+        </button>
       </section>
       <!-- ===== [Jerry 新增：YouBike 公共資源面板結束] ===== -->
 
-      <!-- ===== [Jerry 新增：全部零車站右側可放大面板開始] ===== -->
+      <!-- ===== [Jerry 修正：行政區零車站排行右側可放大面板開始] ===== -->
       <Teleport to="body">
         <Transition name="youbike-panel">
-          <div v-if="zeroStationPanelOpen" class="youbike-zero-backdrop" @click.self="closeZeroStationPanel">
-            <aside ref="zeroStationPanel" tabindex="-1" role="dialog" aria-modal="true"
-                   aria-labelledby="zero-station-panel-title" class="youbike-zero-panel"
-                   :class="{ 'is-expanded': zeroStationPanelExpanded }" @keydown.esc="closeZeroStationPanel">
+          <div v-if="zeroDistrictPanelOpen" class="youbike-zero-backdrop" @click.self="closeZeroDistrictPanel">
+            <aside ref="zeroDistrictPanel" tabindex="-1" role="dialog" aria-modal="true"
+                   aria-labelledby="zero-district-panel-title" class="youbike-zero-panel"
+                   :class="{ 'is-expanded': zeroDistrictPanelExpanded }" @keydown.esc="closeZeroDistrictPanel">
               <header class="youbike-zero-panel-head">
                 <div>
-                  <p>新北 YouBike 調度清單</p>
-                  <h2 id="zero-station-panel-title">無車可借場站</h2>
+                  <p>新北 YouBike 行政區統計</p>
+                  <h2 id="zero-district-panel-title">無車可借場站排行</h2>
                 </div>
                 <div class="youbike-zero-panel-actions">
-                  <button type="button" @click="zeroStationPanelExpanded = !zeroStationPanelExpanded">
-                    {{ zeroStationPanelExpanded ? "縮小" : "放大" }}
+                  <button type="button" @click="zeroDistrictPanelExpanded = !zeroDistrictPanelExpanded">
+                    {{ zeroDistrictPanelExpanded ? "縮小" : "放大" }}
                   </button>
-                  <button type="button" class="is-close" aria-label="關閉無車可借場站清單" @click="closeZeroStationPanel">關閉</button>
+                  <button type="button" class="is-close" aria-label="關閉無車可借行政區排行" @click="closeZeroDistrictPanel">關閉</button>
                 </div>
               </header>
 
               <div class="youbike-zero-panel-tools">
-                <label for="zero-station-search">搜尋地點</label>
-                <input id="zero-station-search" v-model="zeroStationSearch" type="search"
-                       placeholder="輸入行政區、站名或地址">
-                <p>顯示 {{ filteredZeroStations.length.toLocaleString("zh-TW") }}／{{ youbikeData.zeroStations.length.toLocaleString("zh-TW") }} 個場站</p>
+                <strong>0 台可借場站最多的行政區</strong>
+                <p>共 {{ youbikeData.allZeroDistricts.length }} 區、{{ youbikeData.zeroBikeStations.toLocaleString("zh-TW") }} 個場站</p>
               </div>
 
-              <ol ref="zeroStationList" class="youbike-zero-station-list">
-                <li v-for="(station, index) in filteredZeroStations" :key="station.id || station.district + station.name">
-                  <span class="youbike-zero-station-index">{{ String(index + 1).padStart(3, "0") }}</span>
-                  <div>
-                    <p><b>{{ station.district }}</b><strong>{{ station.name }}</strong></p>
-                    <address>{{ station.address }}</address>
-                  </div>
+              <ol class="youbike-zero-district-list">
+                <li v-for="(row, index) in youbikeData.allZeroDistricts" :key="row.district">
+                  <span class="youbike-zero-district-rank">{{ String(index + 1).padStart(2, "0") }}</span>
+                  <strong>{{ row.district }}</strong>
+                  <span class="youbike-zero-district-track" aria-hidden="true">
+                    <i :style="{ width: row.widthPercent + '%' }"></i>
+                  </span>
+                  <b>{{ row.count }}<small>站</small></b>
                 </li>
               </ol>
-              <p v-if="!filteredZeroStations.length" class="youbike-zero-no-result">找不到符合的地點</p>
             </aside>
           </div>
         </Transition>
       </Teleport>
-      <!-- ===== [Jerry 新增：全部零車站右側可放大面板結束] ===== -->
+      <!-- ===== [Jerry 修正：行政區零車站排行右側可放大面板結束] ===== -->
 
       <div class="toolbar">
         <span><strong>生活圈稀缺率 Top 5</strong></span>

@@ -31,7 +31,6 @@ function parseOfficialTime(value) {
 
 function summarize(stations, payloadUpdatedAt, isSnapshot) {
   const zeroByDistrict = new Map();
-  const zeroStations = [];
   let totalDocks = 0;
   let availableBikes = 0;
   let zeroBikeStations = 0;
@@ -41,35 +40,31 @@ function summarize(stations, payloadUpdatedAt, isSnapshot) {
     availableBikes += station.available;
     if (station.available === 0) {
       zeroBikeStations += 1;
-      zeroStations.push(station);
       zeroByDistrict.set(station.district, (zeroByDistrict.get(station.district) || 0) + 1);
     }
   });
 
-  zeroStations.sort(function (a, b) {
-    return a.district.localeCompare(b.district, "zh-Hant") || a.name.localeCompare(b.name, "zh-Hant");
-  });
-
-  const topZeroDistricts = Array.from(zeroByDistrict, function ([district, count]) {
+  /* [Jerry 修正：放大內容是「行政區排行」，不是逐站地址清單。] */
+  const allZeroDistricts = Array.from(zeroByDistrict, function ([district, count]) {
     return { district, count };
   }).sort(function (a, b) {
     return b.count - a.count || a.district.localeCompare(b.district, "zh-Hant");
-  }).slice(0, 5);
-  const maxZeroCount = topZeroDistricts.length ? topZeroDistricts[0].count : 0;
+  });
+  const maxZeroCount = allZeroDistricts.length ? allZeroDistricts[0].count : 0;
+  const rankedZeroDistricts = allZeroDistricts.map(function (row) {
+    return {
+      ...row,
+      widthPercent: maxZeroCount ? Math.round((row.count / maxZeroCount) * 100) : 0,
+    };
+  });
 
   return {
     stationCount: stations.length,
     totalDocks,
     availableBikes,
     zeroBikeStations,
-    /* [Jerry 新增：供右側可捲動面板列出全部零車站名稱與地址] */
-    zeroStations,
-    topZeroDistricts: topZeroDistricts.map(function (row) {
-      return {
-        ...row,
-        widthPercent: maxZeroCount ? Math.round((row.count / maxZeroCount) * 100) : 0,
-      };
-    }),
+    allZeroDistricts: rankedZeroDistricts,
+    topZeroDistricts: rankedZeroDistricts.slice(0, 5),
     updatedAt: parseOfficialTime(payloadUpdatedAt || stations[0]?.updatedAt),
     isSnapshot,
   };
