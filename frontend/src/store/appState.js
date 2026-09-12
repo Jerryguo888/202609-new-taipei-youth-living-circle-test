@@ -27,6 +27,7 @@ import {
 } from "../lib/mapLibreMap.js";
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
 import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
+import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
 
 const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—" };
 
@@ -54,6 +55,16 @@ export const appState = reactive({
       copy: "各行政區公共托育稀缺率（依機構數與20~29歲青年人口推估，公立／私立分開疊圖）",
       rows: [],
     },
+    /* [本次新增：交通稀缺率＝(需求標準化分數－供給標準化分數)／需求標準化分數×100，
+       需求＝20~29歲青年人口、供給＝30分鐘平均可達站數，見 loadTransitGapData /
+       lib/transitGap.js，rows 在資料載入完成前先留空。] */
+    transit: {
+      label: "交通",
+      unit: "%",
+      metricLabel: "稀缺率",
+      copy: "各行政區交通稀缺率（需求標準化分數與供給標準化分數的落差；需求為20~29歲人口，供給為30分鐘平均可達站數）",
+      rows: [],
+    },
   },
   transitLoaded: false,
   transitLoading: false,
@@ -62,6 +73,12 @@ export const appState = reactive({
   childcareGapLoaded: false,
   childcareGapLoading: false,
   childcareGapStatus: "托育缺口資料待載入",
+  /* [本次新增：死因統計使用獨立狀態，不影響既有托育缺口資料與錯誤處理] */
+  mortalityLoaded: false,
+  mortalityLoading: false,
+  mortalityStatus: "死因統計資料待載入",
+  mortalityYear: "",
+  mortalityRows: [],
   stopMode: "bus",
   stationGroups: [],
   activeDistrict: "板橋區",
@@ -105,40 +122,63 @@ export const appState = reactive({
       { name: "淡水區", score: 68 },
     ];
   },
-  /* [本次改版：把每一類資料取前五名，並算出長條圖的寬度百分比
-     （相對於該類前五名裡最大的數值）供長條圖渲染；托育這類額外附帶
-     segments（公立／私立），畫成橫向疊圖，學校／停車維持單一色塊。] */
+  /* [本次改版：圖表預設只畫前五名，但點開「查看所有區域」要能看到完整排行，
+     所以除了 rows（前五名）以外，也算一份 allRows（全部區域，一樣依數值排序），
+     兩者共用同一個 maxValue（=全部區域裡的最大值＝前五名的第一筆）算長條寬度百分比，
+     確保展開後的長條跟前五名的長條走同一把尺，不會展開後突然跳動比例。托育這類
+     額外附帶 segments（公立／私立），畫成橫向疊圖，學校／停車維持單一色塊。] */
   get resourceGapCharts() {
     return Object.keys(this.resourceGaps).map(function (key) {
       const category = this.resourceGaps[key];
-      const top5 = category.rows.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
-      const maxValue = top5.length ? top5[0].value : 0;
+      const sorted = category.rows.slice().sort(function (a, b) { return b.value - a.value; });
+      const maxValue = sorted.length ? sorted[0].value : 0;
+      const mapRow = function (row) {
+        const segments = row.segments
+          ? row.segments.map(function (segment) {
+              return {
+                key: segment.key,
+                label: segment.label,
+                value: segment.value,
+                widthPercent: maxValue ? Math.round((segment.value / maxValue) * 100) : 0,
+              };
+            })
+          : null;
+        return {
+          area: row.area,
+          value: row.value,
+          widthPercent: maxValue ? Math.round((row.value / maxValue) * 100) : 0,
+          segments: segments,
+        };
+      };
       return {
         key: key,
         label: category.label,
         unit: category.unit,
         metricLabel: category.metricLabel,
         copy: category.copy,
-        rows: top5.map(function (row) {
-          const segments = row.segments
-            ? row.segments.map(function (segment) {
-                return {
-                  key: segment.key,
-                  label: segment.label,
-                  value: segment.value,
-                  widthPercent: maxValue ? Math.round((segment.value / maxValue) * 100) : 0,
-                };
-              })
-            : null;
-          return {
-            area: row.area,
-            value: row.value,
-            widthPercent: maxValue ? Math.round((row.value / maxValue) * 100) : 0,
-            segments: segments,
-          };
-        }),
+        rows: sorted.slice(0, 5).map(mapRow),
+        allRows: sorted.map(mapRow),
       };
     }, this);
+  },
+  /* [本次新增：完整排行保留在 mortalityRows，首頁卡片只取排序後前五名] */
+  get mortalityTop5Rows() {
+    return this.mortalityRows.slice(0, 5);
+  },
+  /* [本次新增：由29區資料動態加總全新北市的同齡自殺死亡占比，供放大圖表標題顯示] */
+  get mortalityCitySummary() {
+    const totals = this.mortalityRows.reduce(function (summary, row) {
+      summary.suicideDeaths += row.suicideDeaths;
+      summary.totalDeaths += row.totalDeaths;
+      return summary;
+    }, { suicideDeaths: 0, totalDeaths: 0 });
+    return {
+      suicideDeaths: totals.suicideDeaths,
+      totalDeaths: totals.totalDeaths,
+      ratio: totals.totalDeaths > 0
+        ? Math.round((totals.suicideDeaths / totals.totalDeaths) * 1000) / 10
+        : null,
+    };
   },
 
   /* ===== methods（原本 Vue methods，行為與呼叫方式不變，只是掛在這個共用單例上） ===== */
@@ -210,6 +250,24 @@ export const appState = reactive({
       this.childcareGapStatus = "資料載入失敗。" + dataLoadHint();
     } finally {
       this.childcareGapLoading = false;
+    }
+  },
+  /* [本次新增：死因統計獨立載入；失敗時不會清空或遮蔽既有托育圖表] */
+  async loadMortalityData() {
+    if (this.mortalityLoaded || this.mortalityLoading) return;
+    this.mortalityLoading = true;
+    this.mortalityStatus = "讀取20~29歲死因統計…";
+    try {
+      const result = await loadYouthSuicideShareRows();
+      this.mortalityYear = result.year;
+      this.mortalityRows = result.rows;
+      this.mortalityLoaded = true;
+      this.mortalityStatus = "";
+    } catch (error) {
+      console.error(error);
+      this.mortalityStatus = "資料載入失敗。" + dataLoadHint();
+    } finally {
+      this.mortalityLoading = false;
     }
   },
   chooseStop(nodeId, moveMap) {
@@ -307,5 +365,6 @@ export async function ensureViewReady(view) {
     setIntegratedTransitVisibility(appState.showTransitStops);
   } else if (view === "resources") {
     await appState.loadResourceGapData();
+    await appState.loadMortalityData();
   }
 }
