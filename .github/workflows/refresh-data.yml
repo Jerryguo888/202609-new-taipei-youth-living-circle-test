@@ -1,0 +1,94 @@
+name: refresh data
+
+# 每月重抓一次開放資料 API。
+#
+# 為什麼用 GitHub Actions 排程而不是伺服器上的 cron：排程本身進版控、每次執行有
+# 完整 log、可以手動觸發、失敗會有通知。伺服器上的 crontab 半年後沒人記得它存在，
+# 也沒人會發現它已經壞了三個月。
+#
+# 這個流程**不會**重新部署程式。資料寫進具名 volume，執行中的 chat 容器以
+# mtime 偵測檔案變更後自動重讀，所以不需要重啟容器。
+
+on:
+  schedule:
+    # 每月 1 號 UTC 19:00 = 台灣時間每月 2 號 03:00（離峰）
+    - cron: "0 19 1 * *"
+  workflow_dispatch:
+    inputs:
+      max_shrink:
+        description: "允許的筆數下降比例（0.5 = 50%）。上游大改版時可放寬。"
+        required: false
+        default: "0.5"
+        type: string
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_DIR: /home/ubuntu/202609-new-taipei-youth-living-circle-test
+
+jobs:
+  refresh:
+    runs-on: [self-hosted, main]
+    timeout-minutes: 20
+    env:
+      FETCH_MAX_SHRINK: ${{ inputs.max_shrink || '0.5' }}
+
+    steps:
+      - name: Show current data freshness
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          addr="$(docker compose port web 8080)"
+          port="${addr##*:}"
+          echo "port=${port}" >> "$GITHUB_ENV"
+          echo "--- before ---"
+          curl --fail --silent --show-error --max-time 15 \
+            "http://127.0.0.1:${port}/api/meta/datasets" \
+            | python3 -c 'import json,sys; [print("  ", d) for d in json.load(sys.stdin)["data_freshness"]]'
+
+      - name: Fetch the open data APIs
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          # --rm so the one-shot container does not accumulate.
+          # The refresh service shares the named volume that chat reads from.
+          docker compose run --rm refresh
+
+      - name: Confirm the running container picked up the new data
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          echo "--- after ---"
+          body="$(curl --fail --silent --show-error --max-time 15 \
+            "http://127.0.0.1:${port}/api/meta/datasets")"
+          printf '%s' "$body" | python3 -c 'import json,sys; [print("  ", d) for d in json.load(sys.stdin)["data_freshness"]]'
+
+          # The container reloads on mtime change, so no restart is needed. If a
+          # table is still falling back to the copy baked into the image, the
+          # refresh did not land where the server actually reads from.
+          # Kept as a one-liner: unindented lines inside a YAML block scalar end
+          # the block, and indenting module-level Python is a syntax error.
+          bad="$(printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin)["data_freshness"]; print(",".join(x["table"] for x in d if x.get("bundled_fallback") or x.get("status") != "ok"))')"
+          if [ -z "$bad" ]; then
+            echo "All record tables are being served from the refreshed volume."
+          else
+            echo "::error::These tables are still served from the image copy or are unreadable: ${bad}. The refresh did not reach the path the server reads from. Check that the refresh service and chat mount the same volume."
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### 資料更新"
+            echo ""
+            echo "- 觸發：${{ github.event_name }}"
+            echo "- 筆數下降門檻：\`${FETCH_MAX_SHRINK}\`"
+            echo ""
+            echo "更新後的資料時點見上一步的 log。"
+          } >> "$GITHUB_STEP_SUMMARY"

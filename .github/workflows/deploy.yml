@@ -37,6 +37,17 @@ jobs:
       KB_SEARCH_MODE: ${{ vars.KB_SEARCH_MODE || 'managed' }}
       KB_NUM_RESULTS: ${{ vars.KB_NUM_RESULTS || '5' }}
       MAX_TOKENS: ${{ vars.MAX_TOKENS || '2048' }}
+      # Tool use: lets the assistant pick its own data sources.
+      ENABLE_TOOLS: ${{ vars.ENABLE_TOOLS || 'true' }}
+      MAX_TOOL_ROUNDS: ${{ vars.MAX_TOOL_ROUNDS || '4' }}
+      # local  = read the metrics snapshot baked into the image (no AWS needed)
+      # athena = query the S3 curated layer; falls back to the snapshot on failure
+      METRIC_BACKEND: ${{ vars.METRIC_BACKEND || 'local' }}
+      ATHENA_DATABASE: ${{ vars.ATHENA_DATABASE || 'ntpc_youth' }}
+      ATHENA_WORKGROUP: ${{ vars.ATHENA_WORKGROUP || 'primary' }}
+      # Required by Athena; a query is rejected outright without a result location.
+      ATHENA_OUTPUT_LOCATION: ${{ vars.ATHENA_OUTPUT_LOCATION }}
+      ATHENA_TIMEOUT_SECONDS: ${{ vars.ATHENA_TIMEOUT_SECONDS || '20' }}
 
     steps:
       - name: Warn on missing CARTO key
@@ -44,13 +55,31 @@ jobs:
         if: ${{ env.VITE_CARTO_KEY == '' }}
         run: echo "::warning::VITE_CARTO_KEY is not set; the CARTO basemap will use the free/watermarked tier."
 
-      - name: Report AI assistant config
+      - name: Report and validate AI assistant config
         run: |
           set -euo pipefail
           echo "Region:         ${AWS_REGION}"
           echo "Model:          ${BEDROCK_MODEL_ID}"
           echo "Knowledge base: ${KNOWLEDGE_BASE_ID:-<none, answering without retrieval>}"
           echo "Search mode:    ${KB_SEARCH_MODE}"
+          echo "Tool use:       ${ENABLE_TOOLS} (max ${MAX_TOOL_ROUNDS} rounds)"
+          echo "Metric backend: ${METRIC_BACKEND}"
+
+          if [ "${METRIC_BACKEND}" = "athena" ]; then
+            echo "Athena database:  ${ATHENA_DATABASE}"
+            echo "Athena workgroup: ${ATHENA_WORKGROUP}"
+            echo "Athena output:    ${ATHENA_OUTPUT_LOCATION:-<unset>}"
+            # Fail now rather than deploy something that silently serves cached
+            # snapshot numbers while claiming to be backed by Athena.
+            if [ -z "${ATHENA_OUTPUT_LOCATION}" ]; then
+              echo "::error::METRIC_BACKEND is athena but ATHENA_OUTPUT_LOCATION is not set. Athena rejects queries without a result location, so every metric query would fall back to the snapshot. Set an ATHENA_OUTPUT_LOCATION repo variable (e.g. s3://your-bucket/athena-results/)."
+              exit 1
+            fi
+            case "${ATHENA_OUTPUT_LOCATION}" in
+              s3://*) ;;
+              *) echo "::error::ATHENA_OUTPUT_LOCATION must be an s3:// URI, got '${ATHENA_OUTPUT_LOCATION}'."; exit 1 ;;
+            esac
+          fi
 
       - name: Pull
         run: |
@@ -119,7 +148,33 @@ jobs:
           # call Bedrock, so it stays green even if AWS access is misconfigured.
           curl --fail --silent --show-error --max-time 10 \
             "http://127.0.0.1:${port}/api/health" | grep -q '"status":"ok"'
-          echo "Smoke test passed on port ${port} (static site + /api proxy)."
+          # The data catalogue and metric endpoints back both the charts and the
+          # assistant's query_metrics tool, so a break here breaks the numbers
+          # everywhere. Neither call touches AWS when METRIC_BACKEND=local.
+          curl --fail --silent --show-error --max-time 15 \
+            "http://127.0.0.1:${port}/api/meta/datasets" | grep -q '"metrics"'
+          curl --fail --silent --show-error --max-time 15 \
+            "http://127.0.0.1:${port}/api/metrics/youth_population?limit=1" | grep -q '"rows"'
+          echo "Smoke test passed on port ${port} (static site + /api proxy + metrics)."
+
+      - name: Check the metric backend is actually the configured one
+        # Only meaningful for athena: the backend deliberately falls back to the
+        # snapshot when Athena is unreachable, so a misconfigured deploy still
+        # answers — with stale numbers and no visible complaint. Surface that.
+        if: ${{ env.METRIC_BACKEND == 'athena' }}
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          addr="$(docker compose port web 8080)"
+          port="${addr##*:}"
+          body="$(curl --fail --silent --show-error --max-time 30 \
+            "http://127.0.0.1:${port}/api/metrics/youth_population?limit=1")"
+          echo "$body"
+          if printf '%s' "$body" | grep -q '"source":"athena"'; then
+            echo "Athena is serving metric queries."
+          else
+            echo "::warning::METRIC_BACKEND is athena but the query was answered by the local snapshot, so Athena is unreachable or misconfigured. Numbers will be from the snapshot baked into the image. Check the instance role has athena/glue/s3 permissions, that the Glue database '${ATHENA_DATABASE}' and its tables exist, and see the 'notes' field above for the underlying error."
+          fi
 
       - name: Check the container can obtain AWS credentials
         # Warning, not a failure: the site and the map work regardless, and the

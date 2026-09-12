@@ -1,10 +1,12 @@
 # Deployment unit for the New Taipei youth living circle site.
 #
-# The app is a fully static SPA, so there is a single service. backend/ is still
-# an empty placeholder; add a second service here once it exists.
+#   web      nginx，靜態 SPA ＋ /api/ 反向代理，唯一對外的 port
+#   chat     AI 助理後端（Bedrock ＋ S3 知識庫），不對外開 port
+#   refresh  一次性資料更新容器，有 profile 所以不會被 up 啟動
 #
 # Local:  cp .env.example .env && docker compose up -d --build
 # Server: driven by .github/workflows/deploy.yml on the self-hosted runner.
+# 資料更新：docker compose run --rm refresh（每月由 refresh-data.yml 排程）
 name: nt-youth-living-circle
 
 services:
@@ -62,6 +64,33 @@ services:
       KB_NUM_RESULTS: ${KB_NUM_RESULTS:-5}
       KB_SEARCH_MODE: ${KB_SEARCH_MODE:-managed}
       SYSTEM_PROMPT: ${SYSTEM_PROMPT:-}
+      # 讓模型自己選要讀哪些資料
+      ENABLE_TOOLS: ${ENABLE_TOOLS:-true}
+      MAX_TOOL_ROUNDS: ${MAX_TOOL_ROUNDS:-4}
+      # local = 讀烘進 image 的指標快照；athena = 查 S3 curated 層
+      METRIC_BACKEND: ${METRIC_BACKEND:-local}
+      ATHENA_DATABASE: ${ATHENA_DATABASE:-ntpc_youth}
+      ATHENA_WORKGROUP: ${ATHENA_WORKGROUP:-primary}
+      ATHENA_OUTPUT_LOCATION: ${ATHENA_OUTPUT_LOCATION:-}
+      ATHENA_TIMEOUT_SECONDS: ${ATHENA_TIMEOUT_SECONDS:-20}
+      # 名冊優先讀這裡（每月更新寫入的 volume）；找不到才退回 image 內建版本
+      RECORDS_DIR: /data/records
+      # ---- 後台（帳號、知識庫檔案上傳、手動更新）----
+      # 帳號檔位置。第一個管理員用 scripts/create_admin.py 建立，見 backend/README.md。
+      ADMIN_USERS_PATH: /data/admin/users.json
+      # 純 HTTP 下必須是 false，否則 cookie 送不出去。有 HTTPS 後請改成 true。
+      ADMIN_COOKIE_SECURE: ${ADMIN_COOKIE_SECURE:-false}
+      ADMIN_SESSION_TTL_MINUTES: ${ADMIN_SESSION_TTL_MINUTES:-480}
+      # 知識庫檔案上傳的目的地（跟資料湖是不同的 bucket）
+      KB_BUCKET: ${KB_BUCKET:-}
+      KB_PREFIX: ${KB_PREFIX:-kb/docs/}
+      KB_DATA_SOURCE_ID: ${KB_DATA_SOURCE_ID:-}
+      KB_MAX_UPLOAD_MB: ${KB_MAX_UPLOAD_MB:-20}
+      FETCH_MAX_SHRINK: ${FETCH_MAX_SHRINK:-0.5}
+    volumes:
+      # 後台要寫帳號檔、手動更新要寫名冊，所以這裡必須可寫。
+      # （先前是 read-only，加上後台功能後不得不放開；純讀取的服務仍然只讀。）
+      - living-circle-data:/data
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -71,3 +100,39 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # 資料更新用的一次性容器，不會被 `docker compose up` 啟動（有 profile）。
+  # 執行：docker compose run --rm refresh
+  # 由 .github/workflows/refresh-data.yml 每月排程觸發。
+  refresh:
+    profiles: ["tools"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-nt-youth-living-circle}-chat:${IMAGE_TAG:-local}
+    environment:
+      RECORDS_DIR: /data/records
+      # 抓到 0 筆、或筆數掉超過一半時保留舊檔不覆蓋，
+      # 避免上游出問題時把名冊清空
+      FETCH_MAX_SHRINK: ${FETCH_MAX_SHRINK:-0.5}
+    volumes:
+      - living-circle-data:/data
+    # 需要寫入，所以不能沿用 chat 的 read-only 掛載
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p /data/records
+        python scripts/fetch_sources.py --out /data/records --max-shrink "$${FETCH_MAX_SHRINK}"
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  # 具名 volume 而不是 bind mount：資料的生命週期跟著服務而不是跟著 checkout 目錄，
+  # `git pull` 或重新 clone 都不會影響已經抓好的資料。
+  living-circle-data:

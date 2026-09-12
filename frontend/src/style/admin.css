@@ -1,0 +1,456 @@
+/* Fira Sans（介面）+ Fira Code（數字／識別碼），來自 ui-ux-pro-max 的字體建議。
+   @import 必須放在所有規則之前，否則會被瀏覽器忽略。 */
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@400;500;600&display=swap");
+
+/* ===== 後台樣式 =====
+   設計來源：ui-ux-pro-max --design-system（density 8 / variance 3 / motion 2）
+     色彩    藍色資料型主色 + 琥珀色強調（accent 已為 WCAG 3:1 調整為 #D97706）
+     字體    Fira Sans（介面）+ Fira Code（數字與識別碼）—— dashboard/admin panel 取向
+     密度    dense（8/32px 間距尺度），因為後台是表格與表單為主
+     動態    subtle（150-300ms），只做不位移版面的狀態轉換
+
+   刻意偏離建議：--design-system 回傳的 pattern 是 "Real-Time / Operations Landing"
+   （行銷頁結構、oversized typography）。那適合對外的登陸頁，不適合每天要看表格的
+   內部工具，所以只採用色彩／字體／密度／檢查表，版面改用資料密集的後台佈局。
+
+   所有樣式都限制在 .admin 底下，避免污染前台既有的視覺。 */
+
+.admin {
+  /* ---- primitive ---- */
+  --admin-primary: #1E40AF;
+  --admin-on-primary: #FFFFFF;
+  --admin-secondary: #3B82F6;
+  --admin-accent: #D97706;
+  --admin-bg: #F8FAFC;
+  --admin-fg: #1E3A8A;
+  --admin-muted: #E9EEF6;
+  --admin-border: #DBEAFE;
+  --admin-destructive: #DC2626;
+  --admin-ring: #1E40AF;
+  --admin-surface: #FFFFFF;
+
+  /* 中性文字色：--admin-fg 是深藍，長段文字用純藍會偏刺眼，
+     另外定一組灰藍作為正文與次要文字，兩者對白底都 >= 4.5:1 */
+  --admin-text: #17233D;
+  --admin-text-muted: #4A5878;
+
+  --admin-success: #15803D;
+  --admin-warning: #B45309;
+
+  /* ---- 間距（dense 8/32 尺度）---- */
+  --admin-space-1: 4px;
+  --admin-space-2: 8px;
+  --admin-space-3: 12px;
+  --admin-space-4: 16px;
+  --admin-space-5: 24px;
+  --admin-space-6: 32px;
+
+  --admin-radius: 6px;
+  --admin-radius-lg: 10px;
+
+  --admin-font: "Fira Sans", system-ui, -apple-system, "Noto Sans TC", sans-serif;
+  --admin-mono: "Fira Code", ui-monospace, "SFMono-Regular", monospace;
+
+  --admin-duration: 180ms;
+
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  overflow-y: auto;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-family: var(--admin-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 尊重系統的減少動態設定；這是 pre-delivery checklist 的一項 */
+@media (prefers-reduced-motion: reduce) {
+  .admin * {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
+
+.admin *,
+.admin *::before,
+.admin *::after { box-sizing: border-box; }
+
+.admin button,
+.admin input,
+.admin select { font: inherit; }
+
+/* ---- 版面 ---- */
+.admin-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--admin-space-5) var(--admin-space-4) var(--admin-space-6);
+}
+
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--admin-space-3);
+  padding-bottom: var(--admin-space-4);
+  border-bottom: 1px solid var(--admin-border);
+  margin-bottom: var(--admin-space-5);
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--admin-space-2);
+  font-weight: 600;
+  color: var(--admin-primary);
+}
+
+.admin-brand svg { width: 20px; height: 20px; }
+
+.admin-title { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+
+.admin-spacer { margin-left: auto; }
+
+.admin-who {
+  display: flex;
+  align-items: center;
+  gap: var(--admin-space-2);
+  color: var(--admin-text-muted);
+  font-size: .82rem;
+}
+
+.admin-role {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--admin-muted);
+  color: var(--admin-primary);
+  font-family: var(--admin-mono);
+  font-size: .72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* ---- 分頁 ---- */
+.admin-tabs {
+  display: flex;
+  gap: var(--admin-space-1);
+  border-bottom: 1px solid var(--admin-border);
+  margin-bottom: var(--admin-space-5);
+  overflow-x: auto;
+}
+
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--admin-space-2);
+  /* 44px 最小點擊高度（checklist） */
+  min-height: 44px;
+  padding: 0 var(--admin-space-4);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--admin-text-muted);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--admin-duration) ease, border-color var(--admin-duration) ease;
+}
+
+.admin-tab:hover { color: var(--admin-primary); }
+.admin-tab[aria-selected="true"] { color: var(--admin-primary); border-bottom-color: var(--admin-primary); }
+.admin-tab svg { width: 16px; height: 16px; }
+
+/* ---- 卡片 ---- */
+.admin-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  padding: var(--admin-space-5);
+  margin-bottom: var(--admin-space-4);
+}
+
+.admin-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--admin-space-3);
+  margin-bottom: var(--admin-space-4);
+}
+
+.admin-card-head h2 { margin: 0; font-size: .95rem; font-weight: 600; color: var(--admin-primary); }
+.admin-card-head p { margin: 0; color: var(--admin-text-muted); font-size: .82rem; }
+
+/* ---- 按鈕 ---- */
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--admin-space-2);
+  min-height: 40px;
+  padding: 0 var(--admin-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--admin-radius);
+  background: var(--admin-primary);
+  color: var(--admin-on-primary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--admin-duration) ease, border-color var(--admin-duration) ease;
+}
+
+.admin-btn:hover:not(:disabled) { background: #1B3A9E; }
+.admin-btn:disabled { opacity: .5; cursor: not-allowed; }
+.admin-btn svg { width: 16px; height: 16px; }
+
+.admin-btn.secondary {
+  background: var(--admin-surface);
+  border-color: var(--admin-border);
+  color: var(--admin-primary);
+}
+.admin-btn.secondary:hover:not(:disabled) { background: var(--admin-muted); }
+
+.admin-btn.accent { background: var(--admin-accent); }
+.admin-btn.accent:hover:not(:disabled) { background: #BE6704; }
+
+.admin-btn.danger { background: var(--admin-destructive); }
+.admin-btn.danger:hover:not(:disabled) { background: #B91C1C; }
+
+.admin-btn.small { min-height: 32px; padding: 0 var(--admin-space-3); font-size: .82rem; }
+
+/* 焦點一律可見，且用 outline 而非位移，避免版面跳動 */
+.admin :focus-visible {
+  outline: 2px solid var(--admin-ring);
+  outline-offset: 2px;
+}
+
+/* ---- 表單 ---- */
+.admin-field { display: flex; flex-direction: column; gap: var(--admin-space-1); }
+.admin-field label { font-size: .82rem; font-weight: 500; color: var(--admin-text-muted); }
+
+.admin-input {
+  min-height: 40px;
+  padding: 0 var(--admin-space-3);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  transition: border-color var(--admin-duration) ease;
+}
+
+.admin-input:hover { border-color: var(--admin-secondary); }
+.admin-input[aria-invalid="true"] { border-color: var(--admin-destructive); }
+
+.admin-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--admin-space-3);
+  align-items: end;
+}
+
+.admin-hint { margin: var(--admin-space-2) 0 0; color: var(--admin-text-muted); font-size: .78rem; }
+
+/* ---- 表格 ---- */
+.admin-table-wrap { overflow-x: auto; }
+
+.admin-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+
+.admin-table th,
+.admin-table td {
+  padding: var(--admin-space-3);
+  border-bottom: 1px solid var(--admin-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-table thead th {
+  color: var(--admin-text-muted);
+  font-size: .78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.admin-table tbody tr:hover { background: var(--admin-bg); }
+.admin-table tbody tr:last-child td { border-bottom: none; }
+
+/* 識別碼、數字、時間用等寬字體對齊，掃讀比較快 */
+.admin-mono { font-family: var(--admin-mono); font-size: .82rem; }
+.admin-num { font-family: var(--admin-mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+.admin-actions { display: flex; gap: var(--admin-space-2); justify-content: flex-end; }
+
+/* ---- 狀態標籤 ---- */
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.admin-badge.ok { background: #DCFCE7; color: var(--admin-success); }
+.admin-badge.warn { background: #FEF3C7; color: var(--admin-warning); }
+.admin-badge.bad { background: #FEE2E2; color: var(--admin-destructive); }
+.admin-badge.idle { background: var(--admin-muted); color: var(--admin-text-muted); }
+
+/* 狀態不能只靠顏色表達（checklist），所以每個 badge 都帶一個小圓點形狀 + 文字 */
+.admin-badge::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ---- 提示訊息 ---- */
+.admin-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--admin-space-3);
+  padding: var(--admin-space-3) var(--admin-space-4);
+  border: 1px solid var(--admin-border);
+  border-left-width: 3px;
+  border-radius: var(--admin-radius);
+  margin-bottom: var(--admin-space-4);
+  font-size: .86rem;
+}
+
+.admin-alert svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+.admin-alert.error { border-left-color: var(--admin-destructive); background: #FEF2F2; color: #991B1B; }
+.admin-alert.success { border-left-color: var(--admin-success); background: #F0FDF4; color: #166534; }
+.admin-alert.warning { border-left-color: var(--admin-warning); background: #FFFBEB; color: #92400E; }
+.admin-alert.info { border-left-color: var(--admin-secondary); background: #EFF6FF; color: #1E40AF; }
+
+/* ---- 登入 ---- */
+.admin-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--admin-space-4);
+}
+
+.admin-login-card {
+  width: min(100%, 400px);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  padding: var(--admin-space-6);
+}
+
+.admin-login-card h1 {
+  margin: 0 0 var(--admin-space-2);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--admin-primary);
+  letter-spacing: -0.01em;
+}
+
+.admin-login-card > p { margin: 0 0 var(--admin-space-5); color: var(--admin-text-muted); font-size: .86rem; }
+
+.admin-login-form { display: flex; flex-direction: column; gap: var(--admin-space-4); }
+
+/* ---- 檔案拖放 ---- */
+.admin-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--admin-space-2);
+  padding: var(--admin-space-6) var(--admin-space-4);
+  border: 1px dashed var(--admin-secondary);
+  border-radius: var(--admin-radius-lg);
+  background: var(--admin-bg);
+  color: var(--admin-text-muted);
+  text-align: center;
+  cursor: pointer;
+  /* 只換顏色不換尺寸，拖曳時版面不會抖 */
+  transition: background var(--admin-duration) ease, border-color var(--admin-duration) ease;
+}
+
+.admin-drop:hover,
+.admin-drop.dragging { background: var(--admin-muted); border-color: var(--admin-primary); }
+.admin-drop svg { width: 28px; height: 28px; color: var(--admin-secondary); }
+.admin-drop strong { color: var(--admin-primary); font-weight: 600; }
+
+/* ---- 統計方塊 ---- */
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--admin-space-3);
+}
+
+.admin-stat {
+  padding: var(--admin-space-3) var(--admin-space-4);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-bg);
+}
+
+.admin-stat dt { margin: 0 0 2px; color: var(--admin-text-muted); font-size: .75rem; }
+.admin-stat dd {
+  margin: 0;
+  font-family: var(--admin-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--admin-primary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.admin-log {
+  margin: var(--admin-space-3) 0 0;
+  padding: var(--admin-space-3);
+  max-height: 220px;
+  overflow: auto;
+  border-radius: var(--admin-radius);
+  background: #0F172A;
+  color: #CBD5E1;
+  font-family: var(--admin-mono);
+  font-size: .78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-empty {
+  padding: var(--admin-space-6) var(--admin-space-4);
+  color: var(--admin-text-muted);
+  text-align: center;
+}
+
+.admin-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--admin-space-2);
+  min-height: 40px;
+  padding: 0 var(--admin-space-3);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface);
+  color: var(--admin-text-muted);
+  cursor: pointer;
+  transition: background var(--admin-duration) ease, color var(--admin-duration) ease;
+}
+
+.admin-exit:hover { background: var(--admin-muted); color: var(--admin-primary); }
+
+@media (max-width: 640px) {
+  .admin-shell { padding: var(--admin-space-4) var(--admin-space-3) var(--admin-space-6); }
+  .admin-card { padding: var(--admin-space-4); }
+  .admin-topbar { flex-wrap: wrap; }
+  .admin-who { font-size: .78rem; }
+}
+
+/* 只給螢幕閱讀器的文字。表格的「操作」欄有標題但視覺上不需要顯示，
+   完全省略標題會讓輔助技術唸不出那一欄是什麼。 */
+.admin .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
