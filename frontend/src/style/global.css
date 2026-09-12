@@ -1388,22 +1388,24 @@
 
     .messages {
       display: flex;
-      width: min(100%, 1040px);
+      width: 100%;
       height: 100%;
       min-height: 0;
-      margin: 0 auto;
+      margin: 0;
       flex-direction: column;
       gap: 22px;
       overflow-y: auto;
-      padding: clamp(28px, 5vh, 56px) clamp(20px, 4vw, 48px);
+      padding: clamp(28px, 5vh, 56px) clamp(18px, 2.2vw, 34px);
       scroll-behavior: smooth;
       scrollbar-width: thin;
       scrollbar-color: rgba(28,95,56,.3) transparent;
     }
 
     .message {
+      align-self: flex-start;
       width: fit-content;
-      max-width: min(76%, 760px);
+      max-width: min(72%, 760px);
+      margin-right: auto;
       padding: 17px 20px 18px;
       border: 1px solid rgba(24,87,47,.1);
       border-radius: 23px 23px 23px 7px;
@@ -1430,6 +1432,8 @@
 
     .message.user {
       align-self: flex-end;
+      margin-right: 0;
+      margin-left: auto;
       border-color: transparent;
       border-radius: 23px 23px 7px 23px;
       background: #18572f;
@@ -1439,8 +1443,38 @@
 
     .message.user small { color: rgba(255,255,255,.7); }
 
+    /* [Jerry 改版：AI 回覆中三點跳動氣泡；chatLoading 之後直接接 AWS 請求生命週期。] */
+    .typing-message { min-width: 142px; }
+
+    .typing-status {
+      display: flex;
+      min-height: 28px;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .typing-label {
+      color: #52665d;
+      font-size: .92rem;
+      font-weight: 720;
+    }
+
+    .typing-dots { display: inline-flex; align-items: center; gap: 6px; }
+
+    .typing-dots i {
+      display: block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #2f8051;
+      animation: chat-typing-bounce 1.05s ease-in-out infinite;
+    }
+
+    .typing-dots i:nth-child(2) { animation-delay: .14s; }
+    .typing-dots i:nth-child(3) { animation-delay: .28s; }
+
     .chat-compose-area {
-      padding: 14px clamp(20px, 4vw, 64px) 18px;
+      padding: 14px clamp(16px, 2.2vw, 28px) 18px;
       border-top: 1px solid rgba(31,65,59,.1);
       background: rgba(250,252,250,.94);
       box-shadow: 0 -12px 36px rgba(31,65,59,.06);
@@ -1471,12 +1505,13 @@
 
     .chat-chip:hover { border-color: rgba(24,87,47,.38); background: #edf5f0; }
     .chat-chip:focus-visible { outline: 3px solid rgba(24,87,47,.2); outline-offset: 2px; }
+    .chat-chip:disabled { cursor: wait; opacity: .5; }
 
     .chat-input {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      width: min(100%, 1040px);
-      margin: 0 auto;
+      width: 100%;
+      margin: 0;
       gap: 10px;
       padding: 7px;
       border: 1px solid rgba(24,87,47,.18);
@@ -1506,6 +1541,7 @@
       padding: 0 16px 0 19px;
       align-items: center;
       justify-content: center;
+      justify-self: end;
       gap: 10px;
       border-radius: 14px;
       background: var(--forest);
@@ -1516,6 +1552,7 @@
 
     .chat-send:hover { background: #0f4726; }
     .chat-send:focus-visible { outline: 3px solid rgba(244,191,34,.55); outline-offset: 2px; }
+    .chat-send:disabled { cursor: wait; opacity: .58; }
     .chat-send b { font-size: 1.2rem; }
 
     .chat-connection-note {
@@ -1532,6 +1569,15 @@
     .chat-fullscreen-leave-active { transition: opacity .2s ease, transform .24s ease; }
     .chat-fullscreen-enter-from,
     .chat-fullscreen-leave-to { opacity: 0; transform: translateY(12px) scale(.992); }
+
+    @keyframes chat-typing-bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+      30% { transform: translateY(-7px); opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .typing-dots i { animation: none; opacity: .72; }
+    }
 
     /* [保留原導覽選單使用的淡入動畫。] */
     @keyframes chat-in {
@@ -1598,7 +1644,7 @@
       .chat-close > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
       .chat-close b { width: 30px; height: 30px; }
       .messages { gap: 15px; padding: 22px 14px; }
-      .message { max-width: 90%; padding: 14px 16px 15px; border-radius: 19px 19px 19px 6px; }
+      .message { max-width: 86%; padding: 14px 16px 15px; border-radius: 19px 19px 19px 6px; }
       .message.user { border-radius: 19px 19px 6px 19px; }
       .message p { font-size: 1rem; line-height: 1.65; }
       .message small { margin-bottom: 5px; font-size: .76rem; }

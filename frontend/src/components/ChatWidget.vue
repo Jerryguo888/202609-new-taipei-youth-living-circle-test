@@ -64,18 +64,27 @@ onBeforeUnmount(function () {
               <small>{{ message.role === "user" ? "你" : "AI 助理" }}</small>
               <p>{{ message.text }}</p>
             </div>
+            <!-- [Jerry 改版：非同步 AI 回覆期間顯示三點跳動氣泡，之後串 AWS API 不需重做版面。] -->
+            <div v-if="appState.chatLoading" class="message typing-message" role="status" aria-label="AI 助理正在回覆">
+              <small>AI 助理</small>
+              <div class="typing-status">
+                <span class="typing-label">回覆中</span>
+                <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              </div>
+            </div>
           </div>
         </main>
 
         <footer class="chat-compose-area">
           <div class="chat-chips" aria-label="快速提問">
             <button type="button" class="chat-chip" v-for="chip in appState.chatChips" :key="chip"
-                    @click="handleChip(chip)">{{ chip }}</button>
+                    :disabled="appState.chatLoading" @click="handleChip(chip)">{{ chip }}</button>
           </div>
           <div class="chat-input">
             <input ref="chatInputEl" v-model="appState.chatInput" @keydown.enter.exact.prevent="handleSend"
                    aria-label="輸入問題" placeholder="問選址、30 分鐘覆蓋或預算配置…">
-            <button type="button" class="chat-send" @click="handleSend" aria-label="送出訊息">
+            <button type="button" class="chat-send" :disabled="appState.chatLoading"
+                    @click="handleSend" aria-label="送出訊息">
               <span>送出</span><b aria-hidden="true">↑</b>
             </button>
           </div>
