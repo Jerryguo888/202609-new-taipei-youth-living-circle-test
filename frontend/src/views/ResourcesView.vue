@@ -4,6 +4,51 @@ import { appState } from "../store/appState.js";
 import MortalityBarRows from "../components/MortalityBarRows.vue";
 import { loadYouBikeDashboard } from "../lib/youbike.js";
 
+/* ===== [本次改版：托育／交通稀缺率的「查看全部」改成跟死因統計一樣，
+   點整張卡片跳出 modal 顯示全部區域，不再用卡片內的 <details> 展開。
+   兩個分類共用同一個 <dialog>，用 activeChartKey 記住目前是哪一類。] */
+const chartDialog = ref(null);
+const chartTriggers = ref({});
+let previousChartDialogOverflow = "";
+const activeChartKey = ref(null);
+const activeChart = computed(function () {
+  return appState.resourceGapCharts.find(function (chart) { return chart.key === activeChartKey.value; }) || null;
+});
+
+function setChartTriggerRef(key, el) {
+  if (el) chartTriggers.value[key] = el;
+}
+
+function openChartDialog(key) {
+  const chart = appState.resourceGapCharts.find(function (item) { return item.key === key; });
+  if (!chart || !chart.allRows.length || !chartDialog.value || chartDialog.value.open) return;
+  activeChartKey.value = key;
+  previousChartDialogOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+  chartDialog.value.showModal();
+}
+
+function closeChartDialog() {
+  if (chartDialog.value && chartDialog.value.open) chartDialog.value.close();
+}
+
+function handleChartDialogClose() {
+  document.body.style.overflow = previousChartDialogOverflow;
+  const key = activeChartKey.value;
+  nextTick(function () {
+    if (key && chartTriggers.value[key]) chartTriggers.value[key].focus();
+  });
+  activeChartKey.value = null;
+}
+
+function handleChartBackdropClick(event) {
+  if (event.target !== chartDialog.value) return;
+  const bounds = chartDialog.value.getBoundingClientRect();
+  const outside = event.clientX < bounds.left || event.clientX > bounds.right
+    || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  if (outside) closeChartDialog();
+}
+
 /* ===== [Jerry 新增：YouBike 面板狀態開始] ===== */
 const youbikeLoading = ref(true);
 const youbikeError = ref("");
@@ -95,6 +140,8 @@ onBeforeUnmount(function () {
   closeZeroDistrictPanel();
   if (mortalityDialog.value && mortalityDialog.value.open) mortalityDialog.value.close();
   document.body.style.overflow = previousBodyOverflow;
+  if (chartDialog.value && chartDialog.value.open) chartDialog.value.close();
+  document.body.style.overflow = previousChartDialogOverflow;
 });
 </script>
 
@@ -108,196 +155,228 @@ onBeforeUnmount(function () {
   <section class="view module resources-view">
     <div class="resource-page-title">公共資源負擔力</div>
     <div class="module-body">
-      <!-- ===== [Jerry 新增：YouBike 公共資源面板開始] ===== -->
-      <section class="youbike-board" aria-labelledby="youbike-board-title">
-        <header class="youbike-board-head">
-          <div>
-            <p class="youbike-wordmark" aria-label="YouBike">you<span>bike</span></p>
-            <h2 id="youbike-board-title">新北公共自行車調度概況</h2>
+      <!-- [本次改版：托育／交通稀缺率並排，死因統計排在下面，YouBike 移到整頁最右側，
+           用 .resources-layout 兩欄 grid 排版；手機寬度會自動收合成單欄堆疊] -->
+      <div class="resources-layout">
+        <div class="resource-main-column">
+          <div class="resource-chart-grid">
+            <article class="resource-chart-card mortality-chart-card" v-for="chart in appState.resourceGapCharts" :key="chart.key"
+                     :ref="(el) => setChartTriggerRef(chart.key, el)"
+                     :class="{ 'is-disabled': !chart.allRows.length }"
+                     :tabindex="chart.allRows.length ? 0 : -1"
+                     :aria-disabled="!chart.allRows.length"
+                     role="button" aria-haspopup="dialog" :aria-describedby="'chart-desc-' + chart.key"
+                     @click="openChartDialog(chart.key)"
+                     @keydown.enter="openChartDialog(chart.key)"
+                     @keydown.space.prevent="openChartDialog(chart.key)">
+              <div class="resource-chart-title">
+                <h2>{{ chart.label }}{{ chart.metricLabel }}</h2>
+                <p :id="'chart-desc-' + chart.key">{{ chart.copy }}</p>
+              </div>
+              <ul v-if="chart.rows[0] && chart.rows[0].segments" class="resource-chart-legend">
+                <li v-for="segment in chart.rows[0].segments" :key="segment.key" :class="'is-' + segment.key">
+                  <i></i>{{ segment.label }}
+                </li>
+              </ul>
+              <p v-if="appState.resourceGapLoadingInfo[chart.key] && appState.resourceGapLoadingInfo[chart.key].loading"
+                 class="resource-chart-status">
+                {{ appState.resourceGapLoadingInfo[chart.key].status }}
+              </p>
+              <p v-else-if="appState.resourceGapLoadingInfo[chart.key] && appState.resourceGapLoadingInfo[chart.key].status"
+                 class="resource-chart-status is-error">
+                {{ appState.resourceGapLoadingInfo[chart.key].status }}
+              </p>
+              <div class="resource-chart-bars">
+                <div class="resource-chart-row" v-for="row in chart.rows" :key="row.area"
+                     :title="row.area + '：' + chart.metricLabel + ' ' + row.value.toLocaleString() + chart.unit">
+                  <span class="resource-chart-label">{{ row.area }}</span>
+                  <span class="resource-chart-bar" :class="'is-' + chart.key">
+                    <template v-if="row.segments">
+                      <i v-for="segment in row.segments" :key="segment.key"
+                         :class="'is-' + segment.key" :style="{ width: segment.widthPercent + '%' }"></i>
+                    </template>
+                    <i v-else :style="{ width: row.widthPercent + '%' }"></i>
+                  </span>
+                  <strong class="resource-chart-value">{{ row.value.toLocaleString() }}<small>{{ chart.unit }}</small></strong>
+                </div>
+              </div>
+              <!-- [本次改版：點開卡片看「所有區域」排行，改成跟死因統計一樣跳 modal，
+                   不再是卡片內的 <details> 展開] -->
+              <div v-if="chart.allRows.length" class="mortality-chart-footer">
+                <p>{{ chart.formula }}</p>
+                <span>查看全部{{ chart.allRows.length }}區</span>
+              </div>
+            </article>
           </div>
-          <p class="youbike-data-time">
-            {{ youbikeLoading ? "資料讀取中…" : (youbikeData.isSnapshot ? "官方資料快照" : "即時資料") }}
-            <span v-if="!youbikeLoading && youbikeData.updatedAt">{{ youbikeData.updatedAt }}</span>
-          </p>
-        </header>
 
-        <p v-if="youbikeError" class="youbike-error" role="alert">{{ youbikeError }}</p>
-
-        <div class="youbike-stat-grid" :class="{ 'is-loading': youbikeLoading }">
-          <article v-for="stat in youbikeStats" :key="stat.key"
-                     class="youbike-stat-card"
-                     :class="'is-' + stat.key">
-            <p>{{ stat.label }}</p>
-            <strong>{{ youbikeLoading ? "—" : stat.value.toLocaleString("zh-TW") }}</strong>
-            <span class="youbike-stat-unit">{{ stat.unit }}</span>
-          </article>
+          <!-- [本次新增：青年健康指標獨立附加在既有托育圖表後方，不改動 resourceGaps.childcare] -->
+          <section class="mortality-section" aria-labelledby="mortality-section-title">
+            <article ref="mortalityTrigger" class="resource-chart-card mortality-chart-card"
+                     :class="{ 'is-disabled': !appState.mortalityRows.length }"
+                     :tabindex="appState.mortalityRows.length ? 0 : -1"
+                     :aria-disabled="!appState.mortalityRows.length"
+                     role="button" aria-haspopup="dialog" aria-describedby="mortality-chart-description"
+                     @click="openMortalityDialog"
+                     @keydown.enter="openMortalityDialog"
+                     @keydown.space.prevent="openMortalityDialog">
+              <div class="resource-chart-title">
+                <div class="mortality-preview-title-row">
+                  <h2>20–29歲自殺死亡占比</h2>
+                  <strong v-if="appState.mortalityRows.length" class="mortality-city-summary">
+                    全新北市：{{ appState.mortalityCitySummary.ratio === null
+                      ? "—"
+                      : appState.mortalityCitySummary.ratio.toFixed(1) + "%" }}
+                    <small>（{{ appState.mortalityCitySummary.suicideDeaths }}/{{ appState.mortalityCitySummary.totalDeaths }}）</small>
+                  </strong>
+                </div>
+                <p id="mortality-chart-description">
+                  各行政區自殺死亡數占同齡全部死因死亡數的比例。
+                </p>
+              </div>
+              <p v-if="appState.mortalityLoading" class="resource-chart-status">
+                {{ appState.mortalityStatus }}
+              </p>
+              <p v-else-if="appState.mortalityStatus" class="resource-chart-status is-error">
+                {{ appState.mortalityStatus }}
+              </p>
+              <MortalityBarRows :rows="appState.mortalityTop5Rows" />
+              <div v-if="appState.mortalityRows.length" class="mortality-chart-footer">
+                <p>占比＝自殺死亡數（代碼131）÷ 同年度20–29歲全部死因死亡數</p>
+                <span>查看全部29區</span>
+              </div>
+            </article>
+          </section>
         </div>
 
-        <!-- [Jerry 修正：點擊的是行政區 Top 5 排行卡，不是上方「無車可借站」數字卡。] -->
-        <button ref="zeroDistrictTrigger" type="button" class="youbike-ranking-card is-action"
-                aria-haspopup="dialog" :aria-expanded="zeroDistrictPanelOpen"
-                @click="openZeroDistrictPanel">
-          <div class="youbike-ranking-head">
+        <!-- ===== [Jerry 新增：YouBike 公共資源面板開始] ===== -->
+        <section class="youbike-board" aria-labelledby="youbike-board-title">
+          <header class="youbike-board-head">
             <div>
-              <p>調度優先觀察</p>
-              <h3>無車可借場站數前五區</h3>
+              <h2 id="youbike-board-title">新北公共自行車調度概況</h2>
             </div>
-            <span>可借車輛 = 0 · 查看完整排行 ↗</span>
-          </div>
-          <ol v-if="!youbikeLoading && youbikeData.topZeroDistricts.length" class="youbike-ranking-list">
-            <li v-for="(row, index) in youbikeData.topZeroDistricts" :key="row.district">
-              <span class="youbike-ranking-index">{{ String(index + 1).padStart(2, "0") }}</span>
-              <strong>{{ row.district }}</strong>
-              <span class="youbike-ranking-track" aria-hidden="true">
-                <i :style="{ width: row.widthPercent + '%' }"></i>
-              </span>
-              <b>{{ row.count }}<small>站</small></b>
-            </li>
-          </ol>
-          <p v-else class="youbike-ranking-empty">{{ youbikeLoading ? "正在統計 29 區站點…" : "目前沒有排行資料" }}</p>
-        </button>
-      </section>
-      <!-- ===== [Jerry 新增：YouBike 公共資源面板結束] ===== -->
+            <p class="youbike-data-time">
+              {{ youbikeLoading ? "資料讀取中…" : (youbikeData.isSnapshot ? "官方資料快照" : "即時資料") }}
+              <span v-if="!youbikeLoading && youbikeData.updatedAt">{{ youbikeData.updatedAt }}</span>
+            </p>
+          </header>
 
-      <!-- ===== [Jerry 修正：行政區零車站排行中央放大視窗開始] ===== -->
-      <Teleport to="body">
+          <p v-if="youbikeError" class="youbike-error" role="alert">{{ youbikeError }}</p>
+
+          <div class="youbike-stat-grid" :class="{ 'is-loading': youbikeLoading }">
+            <article v-for="stat in youbikeStats" :key="stat.key" class="youbike-stat-card" :class="'is-' + stat.key">
+              <p>{{ stat.label }}</p>
+              <strong>{{ youbikeLoading ? "—" : stat.value.toLocaleString("zh-TW") }}</strong>
+              <span>{{ stat.unit }}</span>
+            </article>
+          </div>
+
+          <!-- [本次改版：跟托育／交通稀缺率、死因統計一樣，點整張卡片可以查看
+               所有 29 區的完整排行，不只前五區；點開的放大視窗沿用 Jerry 已經
+               準備好的 .youbike-zero-panel 樣式，只是原本沒有接上任何觸發點。] -->
+          <article ref="zeroDistrictTrigger" class="youbike-ranking-card mortality-chart-card"
+                   :class="{ 'is-disabled': youbikeLoading || youbikeError || !youbikeData.allZeroDistricts.length }"
+                   :tabindex="(youbikeLoading || youbikeError || !youbikeData.allZeroDistricts.length) ? -1 : 0"
+                   :aria-disabled="youbikeLoading || youbikeError || !youbikeData.allZeroDistricts.length"
+                   role="button" aria-haspopup="dialog" aria-describedby="youbike-ranking-description"
+                   @click="openZeroDistrictPanel"
+                   @keydown.enter="openZeroDistrictPanel"
+                   @keydown.space.prevent="openZeroDistrictPanel">
+            <div class="youbike-ranking-head">
+              <div>
+                <h3>無車可借場站數前五區</h3>
+              </div>
+            </div>
+            <ol v-if="!youbikeLoading && youbikeData.topZeroDistricts.length" class="youbike-ranking-list">
+              <li v-for="(row, index) in youbikeData.topZeroDistricts" :key="row.district">
+                <!-- <span class="youbike-ranking-index">{{ String(index + 1).padStart(2, "0") }}</span> -->
+                <strong>{{ row.district }}</strong>
+                <span class="youbike-ranking-track" aria-hidden="true">
+                  <i :style="{ width: row.widthPercent + '%' }"></i>
+                </span>
+                <b>{{ row.count }}<small>站</small></b>
+              </li>
+            </ol>
+            <p v-else class="youbike-ranking-empty">{{ youbikeLoading ? "正在統計 29 區站點…" : "目前沒有排行資料" }}</p>
+            <div v-if="!youbikeLoading && youbikeData.allZeroDistricts.length" class="mortality-chart-footer">
+              <p id="youbike-ranking-description">無車可借場站數＝該區目前可借車輛為 0 的場站數。</p>
+              <span>查看全部29區</span>
+            </div>
+          </article>
+        </section>
+        <!-- ===== [Jerry 新增：YouBike 公共資源面板結束] ===== -->
+
+        <!-- ===== [Jerry 修正：無車可借行政區排行置中放大視窗——補上模板，
+             CSS 早就準備好了但沒有任何地方 v-if 開啟過，等於是死掉的樣式] ===== -->
         <Transition name="youbike-panel">
           <div v-if="zeroDistrictPanelOpen" class="youbike-zero-backdrop" @click.self="closeZeroDistrictPanel">
-            <aside ref="zeroDistrictPanel" tabindex="-1" role="dialog" aria-modal="true"
-                   aria-labelledby="zero-district-panel-title" class="youbike-zero-panel"
-                   @keydown.esc="closeZeroDistrictPanel">
+            <div ref="zeroDistrictPanel" class="youbike-zero-panel" role="dialog" aria-modal="true"
+                 aria-labelledby="youbike-zero-panel-title" tabindex="-1" @keydown.esc="closeZeroDistrictPanel">
               <header class="youbike-zero-panel-head">
                 <div>
-                  <p>新北 YouBike 行政區統計</p>
-                  <h2 id="zero-district-panel-title">無車可借場站排行</h2>
+                  <h2 id="youbike-zero-panel-title">無車可借場站數</h2>
+                  <p id="mortality-chart-description">
+                    各行政區自殺死亡數占同齡全部死因死亡數的比例。
+                  </p>
                 </div>
                 <div class="youbike-zero-panel-actions">
-                  <button type="button" class="is-close" aria-label="關閉無車可借行政區排行" @click="closeZeroDistrictPanel">關閉</button>
+                  <button type="button" class="is-close" @click="closeZeroDistrictPanel">x</button>
                 </div>
               </header>
-
-              <div class="youbike-zero-panel-tools">
-                <strong>0 台可借場站的完整行政區排行</strong>
-                <p>共 29 區、{{ youbikeData.zeroBikeStations.toLocaleString("zh-TW") }} 個無車可借場站；沒有發生的行政區仍列為 0 站</p>
-              </div>
-
-              <ol class="youbike-zero-district-list">
-                <li v-for="(row, index) in youbikeData.allZeroDistricts" :key="row.district"
-                    :class="{ 'is-zero': row.count === 0 }">
-                  <span class="youbike-zero-district-rank">{{ String(index + 1).padStart(2, "0") }}</span>
+              <ul class="youbike-zero-district-list">
+                <li v-for="row in youbikeData.allZeroDistricts" :key="row.district" :class="{ 'is-zero': row.count === 0 }">
                   <strong>{{ row.district }}</strong>
                   <span class="youbike-zero-district-track" aria-hidden="true">
                     <i :style="{ width: row.widthPercent + '%' }"></i>
                   </span>
                   <b>{{ row.count }}<small>站</small></b>
                 </li>
-              </ol>
-            </aside>
+              </ul>
+            </div>
           </div>
         </Transition>
-      </Teleport>
-      <!-- ===== [Jerry 修正：行政區零車站排行中央放大視窗結束] ===== -->
-
-      <div class="toolbar">
-        <span><strong>生活圈稀缺率 Top 5</strong></span>
-        <span class="info-tag">依稀缺率排序・僅顯示前五名</span>
       </div>
-      <div class="resource-chart-grid">
-        <article class="resource-chart-card" v-for="chart in appState.resourceGapCharts" :key="chart.key">
-          <div class="resource-chart-title">
-            <h2>{{ chart.label }}{{ chart.metricLabel }}</h2>
-            <p>{{ chart.copy }}</p>
+    </div>
+
+    <!-- [本次改版：托育／交通稀缺率共用這一個 modal，樣式跟下面死因統計的
+         mortality-dialog 完全共用同一套 CSS class，activeChart 記住目前點的是哪一類] -->
+    <dialog ref="chartDialog" class="mortality-dialog"
+            aria-labelledby="chart-dialog-title" aria-describedby="chart-dialog-description"
+            @close="handleChartDialogClose" @click="handleChartBackdropClick">
+      <section class="mortality-dialog-panel" v-if="activeChart">
+        <header class="mortality-dialog-header">
+          <div>
+            <div class="mortality-dialog-title-row">
+              <h2 id="chart-dialog-title">{{ activeChart.label }}{{ activeChart.metricLabel }}</h2>
+            </div>
+            <p id="chart-dialog-description">{{ activeChart.copy }}</p>
           </div>
-          <ul v-if="chart.rows[0] && chart.rows[0].segments" class="resource-chart-legend">
-            <li v-for="segment in chart.rows[0].segments" :key="segment.key" :class="'is-' + segment.key">
+          <button type="button" class="mortality-dialog-close" aria-label="關閉完整行政區排行"
+                  @click="closeChartDialog">×</button>
+        </header>
+        <div class="mortality-dialog-body">
+          <ul v-if="activeChart.allRows[0] && activeChart.allRows[0].segments" class="resource-chart-legend">
+            <li v-for="segment in activeChart.allRows[0].segments" :key="segment.key" :class="'is-' + segment.key">
               <i></i>{{ segment.label }}
             </li>
           </ul>
-          <p v-if="appState.resourceGapLoadingInfo[chart.key] && appState.resourceGapLoadingInfo[chart.key].loading"
-             class="resource-chart-status">
-            {{ appState.resourceGapLoadingInfo[chart.key].status }}
-          </p>
-          <p v-else-if="appState.resourceGapLoadingInfo[chart.key] && appState.resourceGapLoadingInfo[chart.key].status"
-             class="resource-chart-status is-error">
-            {{ appState.resourceGapLoadingInfo[chart.key].status }}
-          </p>
           <div class="resource-chart-bars">
-            <div class="resource-chart-row" v-for="row in chart.rows" :key="row.area"
-                 :title="row.area + '：' + chart.metricLabel + ' ' + row.value.toLocaleString() + chart.unit">
+            <div class="resource-chart-row" v-for="row in activeChart.allRows" :key="row.area"
+                 :title="row.area + '：' + activeChart.metricLabel + ' ' + row.value.toLocaleString() + activeChart.unit">
               <span class="resource-chart-label">{{ row.area }}</span>
-              <span class="resource-chart-bar" :class="'is-' + chart.key">
+              <span class="resource-chart-bar" :class="'is-' + activeChart.key">
                 <template v-if="row.segments">
                   <i v-for="segment in row.segments" :key="segment.key"
                      :class="'is-' + segment.key" :style="{ width: segment.widthPercent + '%' }"></i>
                 </template>
                 <i v-else :style="{ width: row.widthPercent + '%' }"></i>
               </span>
-              <strong class="resource-chart-value">{{ row.value.toLocaleString() }}<small>{{ chart.unit }}</small></strong>
+              <strong class="resource-chart-value">{{ row.value.toLocaleString() }}<small>{{ activeChart.unit }}</small></strong>
             </div>
           </div>
-          <!-- [本次新增：點開可以看到該類別「所有區域」的排行，不只前五名] -->
-          <details class="resource-chart-expand" v-if="chart.allRows.length > chart.rows.length">
-            <summary>查看全部 {{ chart.allRows.length }} 區{{ chart.metricLabel }}</summary>
-            <div class="resource-chart-bars resource-chart-bars-full">
-              <div class="resource-chart-row" v-for="row in chart.allRows" :key="row.area"
-                   :title="row.area + '：' + chart.metricLabel + ' ' + row.value.toLocaleString() + chart.unit">
-                <span class="resource-chart-label">{{ row.area }}</span>
-                <span class="resource-chart-bar" :class="'is-' + chart.key">
-                  <template v-if="row.segments">
-                    <i v-for="segment in row.segments" :key="segment.key"
-                       :class="'is-' + segment.key" :style="{ width: segment.widthPercent + '%' }"></i>
-                  </template>
-                  <i v-else :style="{ width: row.widthPercent + '%' }"></i>
-                </span>
-                <strong class="resource-chart-value">{{ row.value.toLocaleString() }}<small>{{ chart.unit }}</small></strong>
-              </div>
-            </div>
-          </details>
-        </article>
-      </div>
-
-      <!-- [本次新增：青年健康指標獨立附加在既有托育圖表後方，不改動 resourceGaps.childcare] -->
-      <section class="mortality-section" aria-labelledby="mortality-section-title">
-        <div class="toolbar mortality-toolbar">
-          <span><strong id="mortality-section-title">青年健康指標 Top 5</strong></span>
-          <span class="info-tag">民國 {{ appState.mortalityYear || "—" }} 年・20–29歲</span>
+          <p class="mortality-data-source">{{ activeChart.formula }}</p>
         </div>
-        <article ref="mortalityTrigger" class="resource-chart-card mortality-chart-card"
-                 :class="{ 'is-disabled': !appState.mortalityRows.length }"
-                 :tabindex="appState.mortalityRows.length ? 0 : -1"
-                 :aria-disabled="!appState.mortalityRows.length"
-                 role="button" aria-haspopup="dialog" aria-describedby="mortality-chart-description"
-                 @click="openMortalityDialog"
-                 @keydown.enter="openMortalityDialog"
-                 @keydown.space.prevent="openMortalityDialog">
-          <div class="resource-chart-title">
-            <div class="mortality-preview-title-row">
-              <h2>20–29歲自殺死亡占比</h2>
-              <strong v-if="appState.mortalityRows.length" class="mortality-city-summary">
-                全新北市：{{ appState.mortalityCitySummary.ratio === null
-                  ? "—"
-                  : appState.mortalityCitySummary.ratio.toFixed(1) + "%" }}
-                <small>（{{ appState.mortalityCitySummary.suicideDeaths }}/{{ appState.mortalityCitySummary.totalDeaths }}）</small>
-              </strong>
-            </div>
-            <p id="mortality-chart-description">
-              各行政區自殺死亡數占同齡全部死因死亡數的比例；點擊圖表查看全部29區。
-            </p>
-          </div>
-          <p v-if="appState.mortalityLoading" class="resource-chart-status">
-            {{ appState.mortalityStatus }}
-          </p>
-          <p v-else-if="appState.mortalityStatus" class="resource-chart-status is-error">
-            {{ appState.mortalityStatus }}
-          </p>
-          <MortalityBarRows :rows="appState.mortalityTop5Rows" />
-          <div v-if="appState.mortalityRows.length" class="mortality-chart-footer">
-            <p>占比＝自殺死亡數（代碼131）÷ 同年度20–29歲全部死因死亡數</p>
-            <span>查看全部29區</span>
-          </div>
-        </article>
       </section>
-    </div>
+    </dialog>
 
     <!-- 使用原生 dialog 提供焦點限制、Escape 關閉與 modal semantics，不使用 Fullscreen API。 -->
     <dialog ref="mortalityDialog" class="mortality-dialog"
@@ -306,7 +385,6 @@ onBeforeUnmount(function () {
       <section class="mortality-dialog-panel">
         <header class="mortality-dialog-header">
           <div>
-            <p class="section-kicker">Youth Health Indicator</p>
             <div class="mortality-dialog-title-row">
               <h2 id="mortality-dialog-title">新北市29區20–29歲自殺死亡占比</h2>
               <strong class="mortality-city-summary">

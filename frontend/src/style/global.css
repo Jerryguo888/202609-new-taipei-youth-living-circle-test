@@ -108,7 +108,8 @@
     .page-container {
       width: min(1600px, calc(100% - 28px));
       margin: 0 auto;
-      padding: 0 0 42px;
+      /* padding: 0 0 42px; */
+      background-color: #0b0e14;
     }
 
     .view { min-height: 100vh; }
@@ -342,15 +343,20 @@
     }
 
     /* ===== [Jerry 新增：YouBike 公共資源面板開始] =====
-       依使用者草圖：黑色外框、左上到右下 2x2 指標卡、下方一張全寬排行卡。 */
+       依使用者草圖：黑色外框、左上到右下 2x2 指標卡、下方一張全寬排行卡。
+       [本次改版：面板移到整頁最右側的固定寬度欄位，不再是置中滿版的頂部橫幅，
+       所以拿掉原本的 width 上限跟置中 margin，改用 .resources-layout 的
+       第二欄寬度（見上方）決定寬度。]
+       [本次改版：外框樣式改成跟 .resource-chart-card（托育／交通稀缺率卡片）
+       一樣，不再用自己的黑色卡片配色——邊框、圓角、陰影、底色都共用同一套，
+       深色版本套用同一個 .resources-view 覆寫規則。] */
     .youbike-board {
-      width: min(100%, 920px);
-      margin: 0 auto 30px;
-      padding: clamp(18px, 3vw, 34px);
-      border-radius: 34px;
-      background: #111312;
-      color: #f6f8f5;
-      box-shadow: 0 26px 70px rgba(17, 19, 18, .18);
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: white;
+      box-shadow: 0 12px 32px rgba(31,65,59,.055);
+      color: var(--ink);
     }
 
     .youbike-board-head {
@@ -364,7 +370,7 @@
 
     .youbike-wordmark {
       margin: 0 0 8px;
-      color: #f6f8f5;
+      color: inherit;
       font-size: .78rem;
       font-weight: 900;
       letter-spacing: -.04em;
@@ -375,22 +381,21 @@
 
     .youbike-board-head h2 {
       margin: 0;
-      font-size: clamp(1.25rem, 2.4vw, 1.9rem);
-      font-weight: 780;
-      letter-spacing: -.045em;
+      font-size: 1.1rem;
+      letter-spacing: -.02em;
     }
 
     .youbike-data-time {
       display: grid;
       gap: 3px;
       margin: 0;
-      color: #c2cbc6;
+      color: var(--ink-soft);
       font-size: .72rem;
       line-height: 1.45;
       text-align: right;
     }
 
-    .youbike-data-time span { color: #7f8b85; font-variant-numeric: tabular-nums; }
+    .youbike-data-time span { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
     .youbike-error {
       margin: 0 0 12px;
@@ -414,27 +419,13 @@
       overflow: hidden;
       padding: clamp(18px, 3vw, 28px);
       border-radius: 25px;
-      background: #eef0ed;
       color: #171a18;
     }
-
-    .youbike-stat-card::after {
-      position: absolute;
-      right: -22px;
-      bottom: -32px;
-      width: 110px;
-      height: 110px;
-      border-radius: 50%;
-      background: rgba(24, 87, 47, .07);
-      content: "";
-    }
-
-    .youbike-stat-card.is-empty::after { background: rgba(213, 80, 50, .08); }
 
     .youbike-stat-card p {
       margin: 0 0 22px;
       color: #5f6964;
-      font-size: .78rem;
+      font-size: 18px;
       font-weight: 760;
       letter-spacing: .04em;
     }
@@ -442,11 +433,18 @@
     .youbike-stat-card strong {
       position: relative;
       z-index: 1;
-      font-size: clamp(2rem, 5vw, 3.7rem);
+      /* [本次改版：面板移到固定 360px 寬的右側欄後，原本以 vw 為準的字級
+         不會跟著欄寬縮小，數字會被 overflow:hidden 裁掉；改成較保守、
+         不受整頁寬度影響的字級上限，確保在 165px 上下的卡片裡也放得下
+         6 位數字。970px 以下版面收合成單欄時卡片變寬，交給下面兩個
+         mobile 斷點各自的字級處理。] */
+      font-size: 44px;
+      color: #ffffff;
       font-weight: 780;
       letter-spacing: -.065em;
       line-height: .86;
       font-variant-numeric: tabular-nums;
+      margin-right: 5px;
     }
 
     .youbike-stat-unit {
@@ -454,7 +452,7 @@
       z-index: 1;
       margin-left: 7px;
       color: #6d7772;
-      font-size: .72rem;
+      font-size: 18px;
       font-weight: 700;
     }
 
@@ -470,8 +468,6 @@
       padding: clamp(18px, 3vw, 30px);
       border: 0;
       border-radius: 25px;
-      appearance: none;
-      background: #eef0ed;
       color: #171a18;
       font: inherit;
       text-align: left;
@@ -504,7 +500,7 @@
 
     .youbike-ranking-head p {
       margin: 0 0 5px;
-      color: #68736d;
+      color: #ffffff;
       font-size: .68rem;
       font-weight: 820;
       letter-spacing: .12em;
@@ -515,6 +511,7 @@
       margin: 0;
       font-size: clamp(1rem, 2vw, 1.35rem);
       letter-spacing: -.025em;
+      color: #ffffff;
     }
 
     .youbike-ranking-head > span {
@@ -535,40 +532,45 @@
       list-style: none;
     }
 
+    /* [本次改版：排行編號 <span class="youbike-ranking-index"> 已經被拿掉
+       （模板裡註解掉了），每列現在只剩 3 個子元素（名稱／長條／數量），
+       但 grid-template-columns 還定義著原本 4 欄，導致瀏覽器照順序把
+       「行政區名稱」塞進原本留給編號的第一欄（只有 20px 寬），才會被截斷
+       成「板..」。改成對應現在 3 個子元素的欄位設定。] */
     .youbike-ranking-list li {
       display: grid;
-      grid-template-columns: 28px 64px minmax(90px, 1fr) 58px;
+      grid-template-columns: 70px minmax(60px, 1fr) 50px;
       align-items: center;
       gap: 10px;
     }
 
-    .youbike-ranking-index {
-      color: #8a938e;
-      font-size: .7rem;
-      font-weight: 820;
-      font-variant-numeric: tabular-nums;
+    .youbike-ranking-list li > strong {
+      overflow: hidden;
+      color: #aebcb7;
+      font-size: .78rem;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
-
-    .youbike-ranking-list li > strong { font-size: .78rem; }
 
     .youbike-ranking-track {
       height: 11px;
       overflow: hidden;
       border-radius: 999px;
-      background: #d9dedb;
+      background: #2b3331;
     }
 
     .youbike-ranking-track i {
       display: block;
       height: 100%;
       border-radius: inherit;
-      background: #1c5f38;
+      background: #bb71ff;
       transition: width .35s ease;
     }
 
     .youbike-ranking-list b {
       text-align: right;
       font-size: 1rem;
+      color: #ffffff;
       font-variant-numeric: tabular-nums;
     }
 
@@ -628,11 +630,10 @@
       justify-content: space-between;
       gap: 16px;
       padding: 20px 18px 16px;
-      border-bottom: 1px solid rgba(255,255,255,.09);
     }
 
     .youbike-zero-panel-head p {
-      margin: 0 0 5px;
+      margin: 8px 0 0;
       color: #8fa099;
       font-size: .64rem;
       font-weight: 780;
@@ -690,11 +691,16 @@
       scrollbar-color: #46524d transparent;
     }
 
+    /* [本次改版：排名 <span class="youbike-zero-district-rank"> 已經拿掉了，
+       每列現在只剩 3 個子元素（名稱／長條／數量），但 grid-template-columns
+       還定義著原本 4 欄，會導致「行政區名稱」被塞進原本留給排名的第一欄
+       （只有 30px 寬），被截斷成兩行。改成對應現在 3 個子元素的欄位設定，
+       這裡欄位比較寬鬆（modal 有 900px 可用），名稱欄給足夠空間。] */
     .youbike-zero-district-list li {
       display: grid;
-      grid-template-columns: 30px 62px minmax(70px, 1fr) 50px;
+      grid-template-columns: 90px minmax(60px, 1fr) 60px;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       padding: 13px 11px;
       border: 1px solid rgba(255,255,255,.08);
       border-radius: 12px;
@@ -709,7 +715,7 @@
     }
 
     .youbike-zero-district-list li > strong {
-      color: #55e6cf;
+      color: #aebcb7;
       font-size: .78rem;
     }
 
@@ -724,10 +730,10 @@
       display: block;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #55e6cf, #f4bf22);
+      background: #bb71ff;
     }
 
-    .youbike-zero-district-list li.is-zero { background: #151a1e; }
+    .youbike-zero-district-list li.is-zero { background: #2c3336; }
     .youbike-zero-district-list li.is-zero > strong,
     .youbike-zero-district-list li.is-zero > b { color: #87958f; }
 
@@ -751,13 +757,26 @@
     /* ===== [Jerry 修正：無車可借行政區排行置中放大視窗結束] ===== */
     /* ===== [Jerry 新增：YouBike 公共資源面板結束] ===== */
 
-    /* ===== [本次改版：資源缺口頁只剩托育一張稀缺率疊圖（學校／停車已刪除），
-       改成單欄置中，卡片限制最大寬度避免長條圖被拉得過寬] ===== */
+    /* [本次改版：整頁改成左右兩欄——左欄放托育／交通稀缺率＋死因統計，
+       右欄固定寬度放 YouBike 面板，貼齊在整頁最右邊；寬度不夠時收合成單欄，
+       YouBike 自然掉到最下面。] */
+    /* [本次改版：align-items 從 start 改成 stretch（grid 預設值），讓左欄
+       （托育／交通／死因統計）跟右邊的 YouBike 卡片底部對齊在同一條線上，
+       不會因為兩邊內容量不同，一邊卡片比另一邊短一截。] */
+    .resources-layout {
+      display: grid;
+      grid-template-columns: 1fr 500px;
+      align-items: stretch;
+      gap: 24px;
+    }
+
+    .resource-main-column { display: grid; gap: 14px; }
+
+    /* [本次改版：托育／交通稀缺率改成並排兩欄（原本學校／停車已刪除時
+       曾經收成單欄置中，現在有兩張圖了改回並排，不用置中限寬）] */
     .resource-chart-grid {
       display: grid;
-      grid-template-columns: 1fr;
-      max-width: 640px;
-      margin: 0 auto;
+      grid-template-columns: repeat(2, 1fr);
       gap: 14px;
     }
 
@@ -796,33 +815,6 @@
 
     .resource-chart-bars { display: grid; gap: 13px; }
 
-    /* [本次新增：卡片底部可以點開看「所有區域」完整排行，樣式比照
-       整合地圖左側面板的 .side-section 摺疊區塊，但改用淺色卡片配色] */
-    .resource-chart-expand {
-      margin-top: 18px;
-      padding-top: 14px;
-      border-top: 1px solid var(--line);
-    }
-    .resource-chart-expand summary {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      list-style: none;
-      font-size: .78rem;
-      font-weight: 600;
-      color: var(--forest-2);
-    }
-    .resource-chart-expand summary::-webkit-details-marker { display: none; }
-    .resource-chart-expand summary::after { content: "展開 ＋"; color: var(--ink-soft); font-size: .68rem; font-weight: 500; }
-    .resource-chart-expand[open] summary::after { content: "收合 −"; }
-    .resource-chart-bars-full {
-      margin-top: 16px;
-      max-height: 480px;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-
     .resource-chart-row {
       display: grid;
       grid-template-columns: 64px 1fr 68px;
@@ -842,7 +834,7 @@
       height: 16px;
       overflow: hidden;
       border-radius: 0 4px 4px 0;
-      background: #edf1ef;
+      background: #2c3336;
     }
 
     .resource-chart-bar i {
@@ -854,7 +846,7 @@
 
     .resource-chart-bar.is-school i { background: linear-gradient(90deg, #8fd6e0, var(--teal)); }
     .resource-chart-bar.is-parking i { background: linear-gradient(90deg, #f0b6a4, var(--coral)); }
-    .resource-chart-bar.is-transit i { background: linear-gradient(90deg, #f5dfa0, #caa62e); }
+    .resource-chart-bar.is-transit i { background: #eab308; }
 
     /* 托育疊圖：公立／私立各自實色，不用漸層，兩色皆已通過 dataviz 色盲／對比驗證 */
     .resource-chart-bar.is-childcare i.is-public { background: var(--forest-2); }
@@ -866,7 +858,7 @@
     .resource-chart-value small { margin-left: 2px; color: var(--ink-soft); font-size: .68rem; font-weight: 600; }
 
     /* ===== [本次新增：20~29歲自殺死亡占比排行與完整29區 modal] ===== */
-    .mortality-section { max-width: 640px; margin-top: 30px; }
+    .mortality-section { margin-top: 30px; }
     .mortality-toolbar { margin-bottom: 14px; }
 
     .mortality-chart-card {
@@ -896,10 +888,12 @@
     .mortality-chart-row {
       display: grid;
       grid-template-columns: 74px minmax(0, 1fr) 112px;
+      justify-content: space-between;
       align-items: center;
       gap: 10px;
       min-width: 0;
       font-size: .82rem;
+      width: 100%;
     }
     .mortality-chart-bars.show-rank .mortality-chart-row {
       grid-template-columns: 30px 86px minmax(180px, 1fr) 128px;
@@ -922,7 +916,7 @@
       line-height: 1.4;
     }
     .mortality-sample-tag.is-empty { background: #edf1ef; color: var(--ink-soft); }
-    .resource-chart-bar.is-mortality i { background: linear-gradient(90deg, #e8aa9f, var(--coral)); }
+    .resource-chart-bar.is-mortality i { background: #e8aa9f; }
     .mortality-chart-value { white-space: nowrap; }
 
     .mortality-chart-footer {
@@ -934,8 +928,8 @@
       padding-top: 14px;
       border-top: 1px solid var(--line);
     }
-    .mortality-chart-footer p { max-width: 420px; margin: 0; color: var(--ink-soft); font-size: .7rem; line-height: 1.55; }
-    .mortality-chart-footer span { flex: none; color: var(--coral); font-size: .75rem; font-weight: 800; }
+    .mortality-chart-footer p { max-width: 420px; margin: 0; color: #aebcb7; font-size: .7rem; line-height: 1.55; }
+    .mortality-chart-footer span { flex: none; color: #ffffff; font-size: .75rem; font-weight: 800; }
 
     .mortality-dialog {
       width: min(1120px, calc(100vw - 32px));
@@ -954,7 +948,8 @@
       max-height: calc(100vh - 32px);
       flex-direction: column;
       overflow: hidden;
-      background: #fff;
+      background: rgba(17, 22, 27, .94);
+      border: 1px solid rgba(255, 255, 255, .14);
     }
     .mortality-dialog-header {
       display: flex;
@@ -966,19 +961,15 @@
     }
     .mortality-dialog-header .section-kicker { margin: 0 0 6px; color: var(--coral); }
     .mortality-dialog-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
-    .mortality-dialog-header h2 { margin: 0; font-size: clamp(1.2rem, 2.5vw, 1.75rem); letter-spacing: -.03em; }
+    .mortality-dialog-header h2 { margin: 0; font-size: clamp(1.2rem, 2.5vw, 1.75rem); letter-spacing: -.03em; color: #ffffff; }
     .mortality-city-summary {
-      padding: 6px 10px;
-      border: 1px solid #f0d0c8;
-      border-radius: 999px;
-      background: #fff8f6;
-      color: #8f382c;
+      color: #e8aa9f;
       white-space: nowrap;
       font-size: .78rem;
       font-variant-numeric: tabular-nums;
     }
     .mortality-city-summary small { font-size: .68rem; font-weight: 700; }
-    .mortality-dialog-header p:last-child { margin: 8px 0 0; color: var(--ink-soft); font-size: .78rem; line-height: 1.6; }
+    .mortality-dialog-header p:last-child { margin: 8px 0 0; color: #aebcb7; font-size: .78rem; line-height: 1.6; }
     .mortality-dialog-close {
       display: grid;
       width: 44px;
@@ -1010,7 +1001,7 @@
       line-height: 1.55;
     }
     .mortality-dialog-note strong { flex: none; color: #8f382c; }
-    .mortality-data-source { margin: 22px 0 0; color: var(--ink-soft); font-size: .7rem; line-height: 1.5; }
+    .mortality-data-source { margin: 22px 0 0; color: #aebcb7; font-size: .7rem; line-height: 1.5; }
 
     @media (prefers-reduced-motion: reduce) {
       .mortality-chart-card, .resource-chart-bar i { transition: none; }
@@ -1034,7 +1025,6 @@
          也不能用固定的 height:100vh（內容比視窗高時會被裁掉），要用 min-height。] */
       box-sizing: border-box;
       width: 100vw;
-      min-height: 100vh;
       margin-left: calc(50% - 50vw);
       padding: 0 calc(50vw - 50%) 40px;
       background: #0b0e14;
@@ -1047,18 +1037,24 @@
       font-weight: 700;
     }
 
-    .resources-view .resource-chart-card {
+    .resources-view .resource-chart-card,
+    .resources-view .youbike-board {
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(17,22,27,.94);
       box-shadow: 0 16px 42px rgba(0,0,0,.32);
+      color: #f4f7f5;
     }
+
+    .resources-view .youbike-board-head h2 { color: #f4f7f5; }
+    .resources-view .youbike-data-time,
+    .resources-view .youbike-data-time span { color: #aebcb7; }
 
     .resources-view .resource-chart-title h2 { color: #f4f7f5; }
     .resources-view .resource-chart-title p { color: #aebcb7; }
 
     .resources-view .resource-chart-legend { color: #aebcb7; }
-    .resources-view .resource-chart-legend li.is-public i { background: #0d9488; }
-    .resources-view .resource-chart-legend li.is-private i { background: #e0623f; }
+    .resources-view .resource-chart-legend li.is-public i { background: var(--forest-2); }
+    .resources-view .resource-chart-legend li.is-private i { background: var(--teal); }
 
     .resources-view .resource-chart-status { color: #aebcb7; }
     .resources-view .resource-chart-status.is-error { color: #ff8a65; }
@@ -1066,15 +1062,35 @@
     .resources-view .resource-chart-label { color: #aebcb7; }
     .resources-view .resource-chart-bar { background: #242a2d; }
     .resources-view .resource-chart-row:hover .resource-chart-bar { background: #2c3336; }
-    .resources-view .resource-chart-bar.is-childcare i.is-public { background: #0d9488; }
-    .resources-view .resource-chart-bar.is-childcare i.is-private { background: #e0623f; }
-    .resources-view .resource-chart-bar.is-transit i { background: linear-gradient(90deg, #7a5c1e, #eab308); }
-    .resources-view .resource-chart-value { color: #f4f7f5; }
-    .resources-view .resource-chart-value small { color: #aebcb7; }
+    .resources-view .resource-chart-bar.is-childcare i.is-public { background: var(--forest-2); }
+    .resources-view .resource-chart-bar.is-childcare i.is-private { background: var(--teal); }
+    .resources-view .resource-chart-bar.is-transit i { background: #eab308 }
+    .resources-view .resource-chart-value { color: #ffffff; }
+    .resources-view .resource-chart-value small { color: #ffffff; }
 
-    .resources-view .resource-chart-expand { border-top: 1px solid rgba(255,255,255,.14); }
-    .resources-view .resource-chart-expand summary { color: #55e6cf; }
-    .resources-view .resource-chart-expand summary::after { color: #aebcb7; }
+    /* ===== [本次改版：托育／交通稀缺率的「查看全部」改成跟死因統計一樣，
+       點卡片跳出 modal，不再用卡片內的 <details> 展開，故拿掉
+       .resource-chart-expand 的深色覆寫規則（連同上面淺色版的定義一起刪除）。
+
+       <dialog> 用 showModal() 只是視覺上跳到瀏覽器的 top layer，DOM 位置仍在
+       .resources-view 底下，上面這些深色覆寫規則的選擇器（.resources-view
+       .resource-chart-xxx）還是會比對到 modal 裡重用的 .resource-chart-bar／
+       .resource-chart-label／.resource-chart-value／.resource-chart-legend，
+       讓白底 modal 裡的文字跟長條變成灰階、幾乎看不清楚（死因統計原本的
+       modal 就已經有這個問題）。modal 面板固定是淺色（.mortality-dialog-panel
+       background:#fff），所以在這裡把顏色改回淺色版本，且要寫在
+       .resources-view 覆寫規則之後才會在選擇器優先權打平時贏過它。] */
+    .mortality-dialog-panel .resource-chart-legend { color: #aebcb7; }
+    .mortality-dialog-panel .resource-chart-legend li.is-public i { background: var(--forest-2); }
+    .mortality-dialog-panel .resource-chart-legend li.is-private i { background: var(--teal); }
+    .mortality-dialog-panel .resource-chart-label { color:#aebcb7; }
+    .mortality-dialog-panel .resource-chart-bar { background: #2b3331;}
+    /* .mortality-dialog-panel .resource-chart-row:hover .resource-chart-bar { background: #e3ebe7; } */
+    .mortality-dialog-panel .resource-chart-bar.is-childcare i.is-public { background: var(--forest-2); }
+    .mortality-dialog-panel .resource-chart-bar.is-childcare i.is-private { background: var(--teal); }
+    .mortality-dialog-panel .resource-chart-bar.is-transit i { background: #eab308; }
+    .mortality-dialog-panel .resource-chart-value { color: #ffffff; }
+    .mortality-dialog-panel .resource-chart-value small { color: #ffffff; }
     /* ===== [本次改版：公共資源負擔力暗色版本結束] ===== */
 
     /* ===== [本次新增：組員既有 3D 地圖整合頁] ===== */
@@ -1290,99 +1306,79 @@
 
     .population-3d-status.error { color: #ffb4b4; }
 
-    /* ===== [Jerry 改版：全畫面 AI 對話工作區開始] ===== */
-    body.has-chat-open { overflow: hidden; }
-
+    /* ===== [Jerry 改版：右側手機型 AI 聊天室開始] ===== */
     .chat-launcher {
       position: fixed;
-      right: 24px;
-      bottom: 30px;
+      right: 20px;
+      bottom: 22px;
       z-index: 2100;
-      display: grid;
-      width: 68px;
-      height: 68px;
-      place-items: center;
-      border: 3px solid rgba(255,255,255,.86);
+      width: 64px;
+      height: 64px;
+      overflow: hidden;
+      padding: 0;
+      border: 0;
       border-radius: 50%;
-      background: var(--forest);
-      color: white;
-      box-shadow: 0 18px 48px rgba(16,59,40,.34);
-      font-size: .92rem;
-      font-weight: 900;
-      letter-spacing: .04em;
+      background: transparent;
+      box-shadow: 0 14px 34px rgba(16,59,40,.3);
       transition: transform .2s ease, box-shadow .2s ease;
     }
 
+    .chat-launcher img { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
     .chat-launcher:hover { transform: translateY(-3px); box-shadow: 0 22px 54px rgba(16,59,40,.42); }
     .chat-launcher:focus-visible { outline: 4px solid rgba(244,191,34,.55); outline-offset: 3px; }
 
     .chat-panel {
       position: fixed;
-      inset: clamp(9px, 1.25vw, 18px);
+      top: 10px;
+      right: 10px;
+      bottom: 10px;
       z-index: 4100;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
-      width: auto;
+      width: min(410px, calc(100vw - 20px));
       height: auto;
       overflow: hidden;
-      border: 1px solid rgba(255,255,255,.58);
-      border-radius: 30px;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 28px;
       outline: 0;
-      background:
-        radial-gradient(circle at 14% 8%, rgba(72, 184, 133, .14), transparent 30%),
-        #eef3f0;
+      background: #f3f6f4;
       color: var(--ink);
-      box-shadow: 0 0 0 100vmax rgba(5,18,12,.48), 0 30px 100px rgba(5,28,18,.35);
+      box-shadow: 0 24px 72px rgba(5,28,18,.3);
     }
 
     .chat-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 24px;
-      min-height: 92px;
-      padding: 18px clamp(22px, 4vw, 64px);
+      gap: 12px;
+      min-height: 58px;
+      padding: 9px 10px 9px 18px;
       color: white;
       background: #123f2b;
-      box-shadow: 0 10px 36px rgba(9, 43, 29, .18);
+      box-shadow: 0 7px 24px rgba(9,43,29,.14);
     }
 
-    .chat-title-group { display: flex; align-items: center; gap: 15px; min-width: 0; }
-
-    .chat-mark {
-      display: grid;
-      width: 48px;
-      height: 48px;
-      flex: 0 0 auto;
-      place-items: center;
-      border: 1px solid rgba(255,255,255,.24);
-      border-radius: 15px;
-      background: rgba(255,255,255,.1);
-      font-size: .92rem;
-      font-weight: 900;
-      letter-spacing: .04em;
-    }
-
-    .chat-header strong { display: block; font-size: clamp(1.35rem, 2vw, 1.85rem); letter-spacing: -.035em; }
-    .chat-header .chat-title-group span:last-child { display: block; margin-top: 4px; font-size: .88rem; opacity: .72; }
+    .chat-title-group { min-width: 0; }
+    .chat-header strong { display: block; font-size: 1.06rem; letter-spacing: -.02em; }
 
     .chat-close {
-      display: flex;
-      min-height: 48px;
-      padding: 0 12px 0 18px;
-      align-items: center;
-      gap: 10px;
+      display: grid;
+      width: 38px;
+      height: 38px;
+      flex: 0 0 auto;
+      padding: 0;
+      place-items: center;
       border: 1px solid rgba(255,255,255,.2);
-      border-radius: 999px;
+      border-radius: 50%;
       background: rgba(255,255,255,.1);
       color: white;
-      font-size: .92rem;
-      font-weight: 760;
+      font-size: 1.45rem;
+      font-weight: 400;
+      line-height: 1;
     }
 
     .chat-close:hover { background: rgba(255,255,255,.18); }
     .chat-close:focus-visible { outline: 3px solid rgba(244,191,34,.62); outline-offset: 3px; }
-    .chat-close b { display: grid; width: 26px; height: 26px; place-items: center; font-size: 1.45rem; font-weight: 400; line-height: 1; }
 
     .chat-workspace { min-height: 0; overflow: hidden; }
 
@@ -1393,40 +1389,73 @@
       min-height: 0;
       margin: 0;
       flex-direction: column;
-      gap: 22px;
+      gap: 12px;
       overflow-y: auto;
-      padding: clamp(28px, 5vh, 56px) clamp(18px, 2.2vw, 34px);
+      padding: 14px 10px 18px;
       scroll-behavior: smooth;
       scrollbar-width: thin;
       scrollbar-color: rgba(28,95,56,.3) transparent;
     }
 
-    .message {
-      align-self: flex-start;
-      width: fit-content;
-      max-width: min(72%, 760px);
-      margin-right: auto;
-      padding: 17px 20px 18px;
-      border: 1px solid rgba(24,87,47,.1);
-      border-radius: 23px 23px 23px 7px;
-      background: rgba(255,255,255,.92);
-      color: var(--ink);
-      box-shadow: 0 12px 34px rgba(31,65,59,.08);
+    .chat-message-row {
+      display: flex;
+      width: 100%;
+      align-items: flex-start;
+      gap: 8px;
     }
 
-    .message small {
-      display: block;
-      margin-bottom: 7px;
-      color: #63766e;
-      font-size: .82rem;
-      font-weight: 800;
-      letter-spacing: .035em;
+    .chat-message-row.user { flex-direction: row-reverse; }
+
+    .chat-avatar {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      margin-top: 20px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 5px 14px rgba(31,65,59,.13);
+    }
+
+    .chat-avatar.is-user {
+      border: 2px solid rgba(255,255,255,.92);
+      object-position: center 42%;
+    }
+
+    .chat-message-content {
+      display: flex;
+      max-width: 78%;
+      min-width: 0;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .chat-message-row.user .chat-message-content { align-items: flex-end; }
+
+    .chat-message-name {
+      margin: 0 4px 4px;
+      color: #61736b;
+      font-size: .72rem;
+      font-weight: 760;
+      line-height: 1.3;
+    }
+
+    .chat-message-row.user .chat-message-name { text-align: right; }
+
+    .message {
+      width: fit-content;
+      max-width: 100%;
+      padding: 10px 13px 11px;
+      border: 1px solid rgba(24,87,47,.1);
+      border-radius: 17px 17px 17px 5px;
+      background: rgba(255,255,255,.92);
+      color: var(--ink);
+      box-shadow: 0 8px 20px rgba(31,65,59,.07);
     }
 
     .message p {
       margin: 0;
-      font-size: clamp(1.02rem, 1.35vw, 1.18rem);
-      line-height: 1.72;
+      font-size: 1rem;
+      line-height: 1.48;
       white-space: pre-line;
     }
 
@@ -1454,40 +1483,35 @@
     .chat-sources li { word-break: break-all; }
 
     .message.user {
-      align-self: flex-end;
-      margin-right: 0;
-      margin-left: auto;
       border-color: transparent;
-      border-radius: 23px 23px 7px 23px;
+      border-radius: 17px 17px 5px 17px;
       background: #18572f;
       color: white;
-      box-shadow: 0 14px 34px rgba(24,87,47,.2);
+      box-shadow: 0 9px 22px rgba(24,87,47,.18);
     }
 
-    .message.user small { color: rgba(255,255,255,.7); }
-
     /* [Jerry 改版：AI 回覆中三點跳動氣泡；chatLoading 之後直接接 AWS 請求生命週期。] */
-    .typing-message { min-width: 142px; }
+    .typing-message { min-width: 120px; }
 
     .typing-status {
       display: flex;
-      min-height: 28px;
+      min-height: 24px;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .typing-label {
       color: #52665d;
-      font-size: .92rem;
+      font-size: .82rem;
       font-weight: 720;
     }
 
-    .typing-dots { display: inline-flex; align-items: center; gap: 6px; }
+    .typing-dots { display: inline-flex; align-items: center; gap: 5px; }
 
     .typing-dots i {
       display: block;
-      width: 9px;
-      height: 9px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #2f8051;
       animation: chat-typing-bounce 1.05s ease-in-out infinite;
@@ -1497,101 +1521,65 @@
     .typing-dots i:nth-child(3) { animation-delay: .28s; }
 
     .chat-compose-area {
-      padding: 14px clamp(16px, 2.2vw, 28px) 18px;
+      padding: 8px 9px 10px;
       border-top: 1px solid rgba(31,65,59,.1);
       background: rgba(250,252,250,.94);
       box-shadow: 0 -12px 36px rgba(31,65,59,.06);
       backdrop-filter: blur(12px);
     }
 
-    .chat-chips {
-      display: flex;
-      width: min(100%, 1040px);
-      margin: 0 auto;
-      gap: 9px;
-      overflow-x: auto;
-      padding: 0 0 11px;
-      scrollbar-width: none;
-    }
-
-    .chat-chip {
-      flex: 0 0 auto;
-      min-height: 40px;
-      padding: 0 15px;
-      border: 1px solid rgba(24,87,47,.18);
-      border-radius: 999px;
-      background: white;
-      color: var(--forest);
-      font-size: .88rem;
-      font-weight: 760;
-    }
-
-    .chat-chip:hover { border-color: rgba(24,87,47,.38); background: #edf5f0; }
-    .chat-chip:focus-visible { outline: 3px solid rgba(24,87,47,.2); outline-offset: 2px; }
-    .chat-chip:disabled { cursor: wait; opacity: .5; }
-
     .chat-input {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       width: 100%;
       margin: 0;
-      gap: 10px;
-      padding: 7px;
+      gap: 5px;
+      padding: 4px;
       border: 1px solid rgba(24,87,47,.18);
-      border-radius: 20px;
+      border-radius: 999px;
       background: white;
-      box-shadow: 0 12px 32px rgba(31,65,59,.08);
+      box-shadow: 0 9px 24px rgba(31,65,59,.09);
     }
 
     .chat-input input {
       min-width: 0;
-      min-height: 52px;
-      padding: 0 16px;
+      min-height: 44px;
+      padding: 0 14px;
       border: 0;
-      border-radius: 14px;
+      border-radius: 999px;
       outline: 0;
       background: transparent;
       color: var(--ink);
-      font-size: 1.05rem;
+      font-size: 1rem;
     }
 
     .chat-input input::placeholder { color: #87958f; }
 
     .chat-send {
-      display: flex;
-      min-width: 106px;
-      min-height: 52px;
-      padding: 0 16px 0 19px;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      width: 44px;
+      min-width: 44px;
+      height: 44px;
+      min-height: 44px;
+      padding: 0;
+      place-items: center;
       justify-self: end;
-      gap: 10px;
-      border-radius: 14px;
+      border-radius: 50%;
       background: var(--forest);
       color: white;
-      font-size: .98rem;
+      font-size: 1.05rem;
       font-weight: 800;
     }
 
     .chat-send:hover { background: #0f4726; }
     .chat-send:focus-visible { outline: 3px solid rgba(244,191,34,.55); outline-offset: 2px; }
     .chat-send:disabled { cursor: wait; opacity: .58; }
-    .chat-send b { font-size: 1.2rem; }
+    /* ===== [Jerry 改版：右側手機型 AI 聊天室結束] ===== */
 
-    .chat-connection-note {
-      width: min(100%, 1040px);
-      margin: 9px auto 0;
-      color: #77867f;
-      font-size: .78rem;
-      line-height: 1.5;
-      text-align: center;
-    }
-    /* ===== [Jerry 改版：全畫面 AI 對話工作區結束] ===== */
-
-    .chat-fullscreen-enter-active,
-    .chat-fullscreen-leave-active { transition: opacity .2s ease, transform .24s ease; }
-    .chat-fullscreen-enter-from,
-    .chat-fullscreen-leave-to { opacity: 0; transform: translateY(12px) scale(.992); }
+    .chat-drawer-enter-active,
+    .chat-drawer-leave-active { transition: opacity .2s ease, transform .24s ease; }
+    .chat-drawer-enter-from,
+    .chat-drawer-leave-to { opacity: 0; transform: translateX(18px) scale(.985); }
 
     @keyframes chat-typing-bounce {
       0%, 60%, 100% { transform: translateY(0); opacity: .4; }
@@ -1614,7 +1602,8 @@
       .home-launch { align-items: flex-start; }
       .home-copy { padding-top: 92px; }
       .home-title { font-size: clamp(3.2rem, 16vw, 5rem); }
-      .resource-chart-grid { max-width: none; }
+      .resources-layout { grid-template-columns: 1fr; }
+      .resource-chart-grid { grid-template-columns: 1fr; }
       .mortality-section { max-width: none; }
       .resource-chart-row { grid-template-columns: 56px 1fr 60px; }
       .mortality-chart-row { grid-template-columns: 66px minmax(0, 1fr) 92px; gap: 8px; }
@@ -1649,7 +1638,7 @@
       .youbike-stat-unit { display: block; margin: 7px 0 0; }
       .youbike-ranking-card { margin-top: 9px; padding: 18px 14px; border-radius: 19px; }
       .youbike-ranking-head { align-items: flex-start; flex-direction: column; gap: 9px; }
-      .youbike-ranking-list li { grid-template-columns: 22px 54px minmax(60px, 1fr) 48px; gap: 7px; }
+      .youbike-ranking-list li { grid-template-columns: 56px minmax(60px, 1fr) 44px; gap: 7px; }
       .youbike-zero-backdrop { padding: 6px; }
       .youbike-zero-panel { width: calc(100vw - 12px); height: calc(100dvh - 12px); margin: 0; border-radius: 18px; }
       .youbike-zero-panel-head { padding: 16px 12px 13px; }
@@ -1657,27 +1646,14 @@
       .youbike-zero-panel-tools { padding: 12px; }
       .youbike-zero-district-list { padding: 7px 8px 12px; }
       .youbike-zero-district-list li { grid-template-columns: 24px 54px minmax(54px, 1fr) 44px; gap: 7px; padding: 12px 9px; }
-      .chat-launcher { right: 16px; bottom: 18px; width: 62px; height: 62px; }
-      .chat-panel { inset: 6px; border-radius: 22px; }
-      .chat-header { min-height: 76px; padding: 12px 14px; }
-      .chat-mark { width: 42px; height: 42px; border-radius: 13px; }
-      .chat-header strong { font-size: 1.18rem; }
-      .chat-header .chat-title-group span:last-child { font-size: .72rem; }
-      .chat-close { min-height: 44px; padding: 0 7px; }
-      .chat-close > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-      .chat-close b { width: 30px; height: 30px; }
-      .messages { gap: 15px; padding: 22px 14px; }
-      .message { max-width: 86%; padding: 14px 16px 15px; border-radius: 19px 19px 19px 6px; }
-      .message.user { border-radius: 19px 19px 6px 19px; }
-      .message p { font-size: 1rem; line-height: 1.65; }
-      .message small { margin-bottom: 5px; font-size: .76rem; }
-      .chat-compose-area { padding: 10px 10px max(10px, env(safe-area-inset-bottom)); }
-      .chat-chips { gap: 7px; padding-bottom: 8px; }
-      .chat-chip { min-height: 36px; padding: 0 12px; font-size: .8rem; }
-      .chat-input { grid-template-columns: minmax(0, 1fr) 50px; gap: 5px; padding: 5px; border-radius: 16px; }
-      .chat-input input { min-height: 48px; padding: 0 11px; font-size: 1rem; }
-      .chat-send { min-width: 50px; min-height: 48px; padding: 0; border-radius: 12px; }
-      .chat-send span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-      .chat-send b { font-size: 1.35rem; }
-      .chat-connection-note { margin-top: 7px; font-size: .7rem; }
+      .chat-launcher { right: 14px; bottom: 16px; width: 60px; height: 60px; }
+      .chat-panel { inset: 6px; width: auto; border-radius: 24px; }
+      .chat-header { min-height: 54px; padding: 7px 8px 7px 15px; }
+      .chat-header strong { font-size: 1rem; }
+      .chat-close { width: 36px; height: 36px; }
+      .messages { gap: 11px; padding: 12px 8px 15px; }
+      .chat-avatar { width: 32px; height: 32px; flex-basis: 32px; margin-top: 19px; }
+      .chat-message-content { max-width: 80%; }
+      .message { padding: 9px 12px 10px; }
+      .chat-compose-area { padding: 7px 7px max(8px, env(safe-area-inset-bottom)); }
     }

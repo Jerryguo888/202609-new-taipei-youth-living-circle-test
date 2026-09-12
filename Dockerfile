@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+    # syntax=docker/dockerfile:1.7
 
 # ---------------------------------------------------------------------------
 # Stage 1 — build the Vue 3 + Vite SPA
