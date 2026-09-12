@@ -1,0 +1,26 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+
+env:
+  DEPLOY_DIR: /home/ubuntu/202609-new-taipei-youth-living-circle-test
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, main]
+    steps:
+      - name: Pull
+        run: |
+          cd "$DEPLOY_DIR"
+          git pull --ff-only
+
+      - name: Compose up
+        run: |
+          cd "$DEPLOY_DIR"
+          docker compose up -d --build --remove-orphans
