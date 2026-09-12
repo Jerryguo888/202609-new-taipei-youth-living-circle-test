@@ -1,8 +1,66 @@
 <script setup>
-import { nextTick, onBeforeUnmount, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { appState } from "../store/appState.js";
 import MortalityBarRows from "../components/MortalityBarRows.vue";
+import { loadYouBikeDashboard } from "../lib/youbike.js";
 
+/* ===== [Jerry 新增：YouBike 面板狀態開始] ===== */
+const youbikeLoading = ref(true);
+const youbikeError = ref("");
+const youbikeData = ref({
+  stationCount: 0,
+  totalDocks: 0,
+  availableBikes: 0,
+  zeroBikeStations: 0,
+  allZeroDistricts: [],
+  topZeroDistricts: [],
+  updatedAt: "",
+  isSnapshot: true,
+});
+
+const youbikeStats = computed(function () {
+  return [
+    { key: "stations", label: "場站數", value: youbikeData.value.stationCount, unit: "站" },
+    { key: "docks", label: "總停車格", value: youbikeData.value.totalDocks, unit: "格" },
+    { key: "available", label: "可借車輛", value: youbikeData.value.availableBikes, unit: "輛" },
+    { key: "empty", label: "無車可借站", value: youbikeData.value.zeroBikeStations, unit: "站" },
+  ];
+});
+
+/* ===== [Jerry 修正：零車「行政區排行」放大面板開始] ===== */
+const zeroDistrictPanelOpen = ref(false);
+const zeroDistrictPanel = ref(null);
+const zeroDistrictTrigger = ref(null);
+
+async function openZeroDistrictPanel() {
+  if (youbikeLoading.value || youbikeError.value) return;
+  zeroDistrictPanelOpen.value = true;
+  document.body.classList.add("has-youbike-zero-panel");
+  await nextTick();
+  zeroDistrictPanel.value?.focus();
+}
+
+function closeZeroDistrictPanel() {
+  zeroDistrictPanelOpen.value = false;
+  document.body.classList.remove("has-youbike-zero-panel");
+  nextTick(function () {
+    zeroDistrictTrigger.value?.focus();
+  });
+}
+
+onMounted(async function () {
+  try {
+    youbikeData.value = await loadYouBikeDashboard();
+  } catch (error) {
+    console.error(error);
+    youbikeError.value = "YouBike 資料暫時無法讀取，請重新整理頁面。";
+  } finally {
+    youbikeLoading.value = false;
+  }
+});
+/* ===== [Jerry 修正：零車「行政區排行」放大面板結束] ===== */
+
+/* [保留組員最新版：青年健康指標 dialog 開關與焦點還原] */
 const mortalityDialog = ref(null);
 const mortalityTrigger = ref(null);
 let previousBodyOverflow = "";
@@ -34,6 +92,7 @@ function handleMortalityBackdropClick(event) {
 }
 
 onBeforeUnmount(function () {
+  closeZeroDistrictPanel();
   if (mortalityDialog.value && mortalityDialog.value.open) mortalityDialog.value.close();
   document.body.style.overflow = previousBodyOverflow;
 });
@@ -65,20 +124,25 @@ onBeforeUnmount(function () {
         <p v-if="youbikeError" class="youbike-error" role="alert">{{ youbikeError }}</p>
 
         <div class="youbike-stat-grid" :class="{ 'is-loading': youbikeLoading }">
-          <article v-for="stat in youbikeStats" :key="stat.key" class="youbike-stat-card" :class="'is-' + stat.key">
+          <article v-for="stat in youbikeStats" :key="stat.key"
+                     class="youbike-stat-card"
+                     :class="'is-' + stat.key">
             <p>{{ stat.label }}</p>
             <strong>{{ youbikeLoading ? "—" : stat.value.toLocaleString("zh-TW") }}</strong>
-            <span>{{ stat.unit }}</span>
+            <span class="youbike-stat-unit">{{ stat.unit }}</span>
           </article>
         </div>
 
-        <article class="youbike-ranking-card">
+        <!-- [Jerry 修正：點擊的是行政區 Top 5 排行卡，不是上方「無車可借站」數字卡。] -->
+        <button ref="zeroDistrictTrigger" type="button" class="youbike-ranking-card is-action"
+                aria-haspopup="dialog" :aria-expanded="zeroDistrictPanelOpen"
+                @click="openZeroDistrictPanel">
           <div class="youbike-ranking-head">
             <div>
               <p>調度優先觀察</p>
               <h3>無車可借場站數前五區</h3>
             </div>
-            <span>可借車輛 = 0</span>
+            <span>可借車輛 = 0 · 查看完整排行 ↗</span>
           </div>
           <ol v-if="!youbikeLoading && youbikeData.topZeroDistricts.length" class="youbike-ranking-list">
             <li v-for="(row, index) in youbikeData.topZeroDistricts" :key="row.district">
@@ -91,9 +155,48 @@ onBeforeUnmount(function () {
             </li>
           </ol>
           <p v-else class="youbike-ranking-empty">{{ youbikeLoading ? "正在統計 29 區站點…" : "目前沒有排行資料" }}</p>
-        </article>
+        </button>
       </section>
       <!-- ===== [Jerry 新增：YouBike 公共資源面板結束] ===== -->
+
+      <!-- ===== [Jerry 修正：行政區零車站排行中央放大視窗開始] ===== -->
+      <Teleport to="body">
+        <Transition name="youbike-panel">
+          <div v-if="zeroDistrictPanelOpen" class="youbike-zero-backdrop" @click.self="closeZeroDistrictPanel">
+            <aside ref="zeroDistrictPanel" tabindex="-1" role="dialog" aria-modal="true"
+                   aria-labelledby="zero-district-panel-title" class="youbike-zero-panel"
+                   @keydown.esc="closeZeroDistrictPanel">
+              <header class="youbike-zero-panel-head">
+                <div>
+                  <p>新北 YouBike 行政區統計</p>
+                  <h2 id="zero-district-panel-title">無車可借場站排行</h2>
+                </div>
+                <div class="youbike-zero-panel-actions">
+                  <button type="button" class="is-close" aria-label="關閉無車可借行政區排行" @click="closeZeroDistrictPanel">關閉</button>
+                </div>
+              </header>
+
+              <div class="youbike-zero-panel-tools">
+                <strong>0 台可借場站的完整行政區排行</strong>
+                <p>共 29 區、{{ youbikeData.zeroBikeStations.toLocaleString("zh-TW") }} 個無車可借場站；沒有發生的行政區仍列為 0 站</p>
+              </div>
+
+              <ol class="youbike-zero-district-list">
+                <li v-for="(row, index) in youbikeData.allZeroDistricts" :key="row.district"
+                    :class="{ 'is-zero': row.count === 0 }">
+                  <span class="youbike-zero-district-rank">{{ String(index + 1).padStart(2, "0") }}</span>
+                  <strong>{{ row.district }}</strong>
+                  <span class="youbike-zero-district-track" aria-hidden="true">
+                    <i :style="{ width: row.widthPercent + '%' }"></i>
+                  </span>
+                  <b>{{ row.count }}<small>站</small></b>
+                </li>
+              </ol>
+            </aside>
+          </div>
+        </Transition>
+      </Teleport>
+      <!-- ===== [Jerry 修正：行政區零車站排行中央放大視窗結束] ===== -->
 
       <div class="toolbar">
         <span><strong>生活圈稀缺率 Top 5</strong></span>
