@@ -1,12 +1,18 @@
 <script setup>
+import { ref } from "vue";
 import { appState } from "../store/appState.js";
+
+/* [Jerry 2026-09-12 新增：整合地圖控制欄可整體滑入／收回左側。]
+   只管理介面開關，不改動地圖、人口或 30 分鐘交通計算狀態。 */
+const mapControlsOpen = ref(true);
 
 function handleAgeGroupChange(age, event) {
   appState.toggleAgeGroup(age, event.target.checked);
 }
 
-function handleTransitStopsChange(event) {
-  appState.toggleTransitStops(event.target.checked);
+/* [Jerry 2026-09-13 新增：公車站與捷運站使用各自的圖層開關。] */
+function handleTransitLayerChange(mode, event) {
+  appState.toggleTransitLayer(mode, event.target.checked);
 }
 </script>
 
@@ -22,46 +28,56 @@ function handleTransitStopsChange(event) {
           <div id="population-3d-tooltip" class="population-3d-tooltip"></div>
           <div id="population-3d-status" class="population-3d-status">歷年人口資料載入中…</div>
 
-          <!-- [本次改版：青年熱區排行、圖例、交通分析整合成左側同一面板，
-               各自可收合，取代原本圖例／年份面板／交通面板三個各自浮動的區塊] -->
-          <div class="map-side-panel">
-            <details class="side-section" open>
-              <summary>圖例</summary>
-              <div class="side-section-body">
-                <label class="legend-row" v-for="(age, index) in appState.legendAgeGroups" :key="age">
-                  <input type="checkbox" class="legend-checkbox"
-                         :checked="appState.selectedAgeGroups.includes(age)"
-                         @change="handleAgeGroupChange(age, $event)">
-                  <span class="swatch" :style="{ background: appState.legendColors[index] }"></span>{{ age }}
-                </label>
-                <!-- [本次新增：交通標點開關，取代原本一直顯示的公車／捷運站點] -->
-                <label class="legend-row">
-                  <input type="checkbox" class="legend-checkbox" :checked="appState.showTransitStops"
-                         @change="handleTransitStopsChange($event)">
-                  <span class="swatch" style="background:#899390"></span>交通標點
-                </label>
-              </div>
-            </details>
+          <!-- ===== [Jerry 2026-09-12 改版：左側地圖控制抽屜開始] =====
+               圖例與交通分析包在同一個深色大面板；整欄可滑入／收回，
+               子區塊依內容高度排列，收合時不再平均分攤剩餘高度。 -->
+          <div class="map-control-drawer" :class="{ 'is-open': mapControlsOpen }">
+            <aside id="map-control-panel" class="map-side-panel" aria-label="地圖顯示與交通分析控制"
+                   :aria-hidden="!mapControlsOpen" :inert="!mapControlsOpen">
+              <header class="map-side-panel-head">
+                <strong>地圖控制</strong>
+              </header>
 
-            <details class="side-section" open>
-              <summary>青年熱區排行</summary>
-              <div class="side-section-body">
-                <div class="forecast-list">
-                  <div class="forecast-row" v-for="row in appState.forecastRows" :key="row.name">
-                    <span>{{ row.name }}</span>
-                    <span class="forecast-bar"><i :style="{ width: row.score + '%' }"></i></span>
-                    <strong>{{ row.score }}</strong>
+              <div class="map-side-panel-sections">
+                <details class="side-section" open>
+                  <summary>圖例</summary>
+                  <div class="side-section-body">
+                    <label class="legend-row" v-for="(age, index) in appState.legendAgeGroups" :key="age">
+                      <input type="checkbox" class="legend-checkbox"
+                             :checked="appState.selectedAgeGroups.includes(age)"
+                             @change="handleAgeGroupChange(age, $event)">
+                      <span class="swatch" :style="{ background: appState.legendColors[index] }"></span>{{ age }}
+                    </label>
+                    <!-- ===== [Jerry 2026-09-13 改版：交通標點獨立開關開始] ===== -->
+                    <fieldset class="transit-legend-group">
+                      <legend>交通標點</legend>
+                      <div class="transit-legend-options">
+                        <label class="legend-row is-transit">
+                          <input type="checkbox" class="legend-checkbox" :checked="appState.showBusStops"
+                                 @change="handleTransitLayerChange('bus', $event)">
+                          <span class="swatch is-bus" aria-hidden="true"></span>公車站
+                        </label>
+                        <label class="legend-row is-transit">
+                          <input type="checkbox" class="legend-checkbox" :checked="appState.showMetroStops"
+                                 @change="handleTransitLayerChange('metro', $event)">
+                          <span class="swatch is-metro" aria-hidden="true"></span>捷運站
+                        </label>
+                      </div>
+                    </fieldset>
+                    <!-- ===== [Jerry 2026-09-13 改版：交通標點獨立開關結束] ===== -->
                   </div>
-                </div>
-              </div>
-            </details>
+                </details>
 
-            <details class="side-section" open>
-              <summary>30 分鐘交通分析</summary>
-              <div class="side-section-body">
+                <details class="side-section" open>
+                  <summary>30 分鐘交通分析</summary>
+                  <div class="side-section-body">
                 <div class="integrated-mode-tabs">
-                  <button :class="{ active: appState.stopMode === 'bus' }" @click="appState.selectStopMode('bus')">公車站</button>
-                  <button :class="{ active: appState.stopMode === 'metro' }" @click="appState.selectStopMode('metro')">捷運站</button>
+                  <button type="button" :class="{ active: appState.stopMode === 'bus' }"
+                          :aria-pressed="appState.stopMode === 'bus'"
+                          @click="appState.selectStopMode('bus')">公車站</button>
+                  <button type="button" :class="{ active: appState.stopMode === 'metro' }"
+                          :aria-pressed="appState.stopMode === 'metro'"
+                          @click="appState.selectStopMode('metro')">捷運站</button>
                 </div>
 
                 <template v-if="appState.stopMode === 'bus'">
@@ -111,9 +127,22 @@ function handleTransitStopsChange(event) {
                 </div>
                 <p class="integrated-model-note">已納入平均候車、站間行駛、停靠、步行轉乘與轉乘候車；目前為規劃估算。</p>
                 <button class="map-reset-button" @click="appState.resetPopulationMapView">回到新北全區</button>
+                  </div>
+                </details>
               </div>
-            </details>
+            </aside>
+
+            <button type="button" class="map-control-drawer-toggle"
+                    :aria-expanded="mapControlsOpen" aria-controls="map-control-panel"
+                    :aria-label="mapControlsOpen ? '收起地圖控制欄' : '展開地圖控制欄'"
+                    @click="mapControlsOpen = !mapControlsOpen">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m15 18-6-6 6-6"></path>
+              </svg>
+              <span>{{ mapControlsOpen ? "收起" : "工具" }}</span>
+            </button>
           </div>
+          <!-- ===== [Jerry 2026-09-12 改版：左側地圖控制抽屜結束] ===== -->
         </div>
       </div>
     </div>

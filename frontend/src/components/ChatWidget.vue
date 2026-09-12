@@ -120,9 +120,14 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
     </Transition>
   </Teleport>
 
-  <button v-if="!appState.chatOpen" ref="chatLauncherEl" type="button" class="chat-launcher" aria-controls="chat-panel"
-          aria-label="開啟生活圈 AI 助理" @click="appState.chatOpen = true">
-    <img :src="aiAvatar" alt="">
-  </button>
+  <!-- [Jerry 2026-09-13 新增：AI 圓形按鈕上方的常駐提示泡泡；聊天室開啟後一起收起。] -->
+  <div v-if="!appState.chatOpen" class="chat-launcher-wrap">
+    <p id="chat-launcher-hint" class="chat-launcher-hint" v-once>我是您的 AI 助理</p>
+    <button ref="chatLauncherEl" type="button" class="chat-launcher" aria-controls="chat-panel"
+            aria-describedby="chat-launcher-hint" aria-label="開啟生活圈 AI 助理"
+            @click="appState.chatOpen = true">
+      <img :src="aiAvatar" alt="">
+    </button>
+  </div>
   <!-- ===== [Jerry 改版：右側手機型 AI 聊天室結束] ===== -->
 </template>
