@@ -118,6 +118,9 @@ export const appState = reactive({
   chatInput: "",
   /* [Jerry 改版：保留 AI 請求中的狀態，日後接 AWS API 時可直接驅動聊天室載入動畫。] */
   chatLoading: false,
+  /* [2026-09-12 新增：AI 自己選資料時的即時狀態，例如「查詢數值：youth_population」。
+     tool use 會讓第一個字延遲拉長，這行字讓使用者知道它在做什麼而不是卡住。] */
+  chatActivity: "",
   chatChips: ["哪裡最適合設點？", "30 分鐘怎麼算？", "幫我看預算方案"],
   chatMessages: [
     /* [Jerry 2026-09-13 更新：聊天室首次歡迎訊息。] */
@@ -399,6 +402,7 @@ export const appState = reactive({
     this.chatMessages.push({ role: "user", text: text });
     this.chatInput = "";
     this.chatLoading = true;
+    this.chatActivity = "";
     await nextTick();
     scrollChatToBottom(messagesEl);
 
@@ -410,10 +414,18 @@ export const appState = reactive({
     const store = this;
     let streamingMessage = null;
 
+    /* 模型每選一份資料就更新狀態字串。這時還沒有任何文字，
+       所以維持 chatLoading，只是把氣泡裡的字換掉。 */
+    function handleTool(tool) {
+      store.chatActivity = tool && tool.summary ? tool.summary : "查詢資料";
+      nextTick(function () { scrollChatToBottom(messagesEl); });
+    }
+
     function handleDelta(delta, full) {
       if (!streamingMessage) {
         store.chatLoading = false;
-        streamingMessage = { role: "assistant", text: "", sources: [], charts: [] };
+        store.chatActivity = "";
+        streamingMessage = { role: "assistant", text: "", sources: [], charts: [], tools: [] };
         store.chatMessages.push(streamingMessage);
       }
       /* 沒有圍籬符號時走快速路徑，不必每個 token 都重跑圖表消毒；
@@ -432,7 +444,11 @@ export const appState = reactive({
 
     let reply;
     try {
-      reply = await this.getChatReply(text, { history: history, onDelta: handleDelta });
+      reply = await this.getChatReply(text, {
+        history: history,
+        onDelta: handleDelta,
+        onTool: handleTool,
+      });
     } catch (error) {
       /* 雲端不通時仍然給得出東西：附上原因，再退回本機情境回覆。 */
       reply = {
@@ -442,8 +458,11 @@ export const appState = reactive({
       };
     }
 
+    this.chatActivity = "";
+
     if (streamingMessage) {
       this.chatLoading = false;
+      streamingMessage.tools = reply.tools || [];
       const finalText = reply.text || streamingMessage.text;
       /* 收尾後重跑一次（streaming=false），把「正在繪製圖表…」的提示換成真的圖表。 */
       const done = splitChartBlocks(finalText, false);
@@ -469,6 +488,7 @@ export const appState = reactive({
         text: done.text || (done.charts.length ? "" : body),
         charts: done.charts,
         sources: reply.sources || [],
+        tools: reply.tools || [],
       });
     }
 

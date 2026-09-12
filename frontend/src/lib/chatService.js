@@ -78,13 +78,14 @@ function createSseParser(onEvent) {
  * @param {object} [options]
  * @param {Array}  [options.history] 先前的對話 [{ role, text }]
  * @param {Function} [options.onDelta] 有值時逐字回呼，用來做打字機效果
- * @returns {Promise<{ text: string, sources: Array, fallback: boolean }>}
+ * @param {Function} [options.onTool] 模型開始讀某份資料時回呼，用來顯示「正在查詢…」
+ * @returns {Promise<{ text: string, sources: Array, tools: Array, fallback: boolean }>}
  */
 export async function getChatReply(text, context, options) {
   const settings = options || {};
 
   if (!CHAT_SERVICE.enabled || !CHAT_SERVICE.endpoint) {
-    return { text: localChatReply(text), sources: [], fallback: true };
+    return { text: localChatReply(text), sources: [], tools: [], fallback: true };
   }
 
   /* 把前端的訊息格式轉成後端要的 {role, content}，並補上這次的輸入。 */
@@ -117,12 +118,19 @@ export async function getChatReply(text, context, options) {
 
     let full = "";
     let sources = [];
+    let toolsUsed = [];
     let streamError = "";
 
     const parser = createSseParser(function (event) {
       if (event.text) {
         full += event.text;
         if (settings.onDelta) settings.onDelta(event.text, full);
+      } else if (event.tool) {
+        /* 模型自己決定要讀哪份資料時後端會送這個事件，
+           拿來即時更新「正在查詢…」的狀態。 */
+        if (settings.onTool) settings.onTool(event.tool);
+      } else if (event.tools_used) {
+        toolsUsed = event.tools_used;
       } else if (event.sources) {
         sources = event.sources;
       } else if (event.error) {
@@ -146,6 +154,7 @@ export async function getChatReply(text, context, options) {
     return {
       text: full || localChatReply(text),
       sources: sources,
+      tools: toolsUsed,
       fallback: !full,
       partialError: full && streamError ? streamError : "",
     };

@@ -82,6 +82,16 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
                     <div v-for="(chart, chartIndex) in (message.charts || [])"
                          :key="'chart-' + chartIndex" class="ai-chart-wrap" v-html="chart"></div>
                   </template>
+                  <!-- [2026-09-12 新增：這次回答讀了哪些資料。AI 是自己決定要查什麼的，
+                       把它的選擇攤開來，使用者才判斷得出數字可不可信。] -->
+                  <details v-if="message.tools && message.tools.length" class="chat-sources chat-tools">
+                    <summary>讀取的資料（{{ message.tools.length }}）</summary>
+                    <ol>
+                      <li v-for="(tool, toolIndex) in message.tools" :key="toolIndex">
+                        {{ tool.summary }}
+                      </li>
+                    </ol>
+                  </details>
                   <!-- [2026-09-12 新增：知識庫引用來源。S3 的 s3:// URI 在瀏覽器點不開，
                        所以只顯示檔名，避免給出一個按了沒反應的連結。] -->
                   <details v-if="message.sources && message.sources.length" class="chat-sources">
@@ -102,7 +112,9 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
                 <small class="chat-message-name">生活圈 AI 助理</small>
                 <div class="message typing-message">
                   <div class="typing-status">
-                    <span class="typing-label">回覆中</span>
+                    <!-- [2026-09-12 改版：AI 會先自己去查資料再回答，那段等待比單純
+                         生成長。顯示它正在讀什麼，等待才不像沒反應。] -->
+                    <span class="typing-label">{{ appState.chatActivity || "回覆中" }}</span>
                     <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
                   </div>
                 </div>

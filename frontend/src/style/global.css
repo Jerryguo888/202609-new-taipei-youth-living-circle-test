@@ -1920,6 +1920,15 @@
 
     .chat-sources li { word-break: break-all; }
 
+    /* [2026-09-12 新增：AI 自己選了哪些資料。跟參考來源同樣式，
+       但用不同的邊框色區分「查了什麼」與「引用了什麼文件」。] */
+    .chat-tools { border-top-color: rgba(24,87,47,.28); }
+    .chat-tools li { word-break: break-word; }
+
+    /* 等待文字會從「回覆中」變成「查詢數值：…」，長度差很多，
+       固定最小寬度避免氣泡在切換時抖動 */
+    .typing-message .typing-label { white-space: nowrap; }
+
     .message.user {
       border-color: transparent;
       border-radius: 17px 17px 5px 17px;
