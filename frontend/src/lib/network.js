@@ -459,3 +459,18 @@ export function loadNetworkCore() {
   });
   return networkLoadPromise;
 }
+
+/* [本次移植：原本放在 leafletMap.js，但這裡只是單純算最近的交通節點，
+   跟 Leaflet 完全無關，移過來後拿掉 Leaflet 地圖也不影響選預設起點] */
+export function nearestNode(lat, lon) {
+  let best = null;
+  let bestDistance = Infinity;
+  transitNodes.forEach(function (node) {
+    const distance = haversineKm(lat, lon, node.lat, node.lon);
+    if (distance < bestDistance) {
+      best = node;
+      bestDistance = distance;
+    }
+  });
+  return { node: best, distanceKm: bestDistance };
+}
