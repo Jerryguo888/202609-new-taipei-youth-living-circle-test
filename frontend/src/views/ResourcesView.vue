@@ -157,6 +157,7 @@ onBeforeUnmount(function () {
     <div class="module-body">
       <!-- [本次改版：托育／交通稀缺率並排，死因統計排在下面，YouBike 移到整頁最右側，
            用 .resources-layout 兩欄 grid 排版；手機寬度會自動收合成單欄堆疊] -->
+      <!-- [Jerry 2026-09-13 固定版面：此區只用 CSS Grid 排版，沒有拖曳／縮放行為。] -->
       <div class="resources-layout">
         <div class="resource-main-column">
           <div class="resource-chart-grid">
@@ -266,7 +267,7 @@ onBeforeUnmount(function () {
             <article v-for="stat in youbikeStats" :key="stat.key" class="youbike-stat-card" :class="'is-' + stat.key">
               <p>{{ stat.label }}</p>
               <strong>{{ youbikeLoading ? "—" : stat.value.toLocaleString("zh-TW") }}</strong>
-              <span>{{ stat.unit }}</span>
+              <span class="youbike-stat-unit">{{ stat.unit }}</span>
             </article>
           </div>
 
