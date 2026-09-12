@@ -1,6 +1,7 @@
 <script setup>
 import { nextTick, ref, watch } from "vue";
 import { appState } from "../store/appState.js";
+import { renderAssistantMarkdown } from "../lib/assistantMarkdown.js";
 import aiAvatar from "../assets/youth-ai-avatar.png";
 import userAvatar from "../assets/jerry-user-avatar.png";
 
@@ -67,16 +68,20 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
               <div class="chat-message-content">
                 <small class="chat-message-name">{{ message.role === "user" ? "USER" : "生活圈 AI 助理" }}</small>
                 <div class="message" :class="{ user: message.role === 'user' }">
-                  <!-- 散文一律走 {{ }}，由 Vue 轉義，永遠不會被當成 HTML 執行。
-                       v-if 是為了「只有圖表、沒有文字」的回覆不留一個空段落。 -->
-                  <p v-if="message.text">{{ message.text }}</p>
+                  <!-- 只有明確標記為 assistant 的回覆才解析 Markdown，且解析結果會先經
+                       DOMPurify 白名單消毒。user 與其他未知 role 一律走 {{ }} 純文字轉義。 -->
+                  <div v-if="message.role === 'assistant' && message.text"
+                       class="message-markdown" v-html="renderAssistantMarkdown(message.text)"></div>
+                  <p v-else-if="message.text">{{ message.text }}</p>
                   <!-- [2026-09-12 新增：模型畫的圖表。
-                       這是全專案唯一使用 v-html 的地方。內容已在 lib/chartHtml.js
+                       這是另一種只屬於 AI 回覆的 v-html。內容已在 lib/chartHtml.js
                        以 DOMPurify 白名單消毒：只留規定的標籤與 class，style 僅允許
                        width 百分比。模型讀得到 S3 知識庫，而知識庫內容屬於不可信
                        輸入（可能被塞提示注入），所以這道消毒不能省。 -->
-                  <div v-for="(chart, chartIndex) in (message.charts || [])"
-                       :key="'chart-' + chartIndex" class="ai-chart-wrap" v-html="chart"></div>
+                  <template v-if="message.role === 'assistant'">
+                    <div v-for="(chart, chartIndex) in (message.charts || [])"
+                         :key="'chart-' + chartIndex" class="ai-chart-wrap" v-html="chart"></div>
+                  </template>
                   <!-- [2026-09-12 新增：這次回答讀了哪些資料。AI 是自己決定要查什麼的，
                        把它的選擇攤開來，使用者才判斷得出數字可不可信。] -->
                   <details v-if="message.tools && message.tools.length" class="chat-sources chat-tools">
@@ -132,9 +137,14 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
     </Transition>
   </Teleport>
 
-  <button v-if="!appState.chatOpen" ref="chatLauncherEl" type="button" class="chat-launcher" aria-controls="chat-panel"
-          aria-label="開啟生活圈 AI 助理" @click="appState.chatOpen = true">
-    <img :src="aiAvatar" alt="">
-  </button>
+  <!-- [Jerry 2026-09-13 新增：AI 圓形按鈕上方的常駐提示泡泡；聊天室開啟後一起收起。] -->
+  <div v-if="!appState.chatOpen" class="chat-launcher-wrap">
+    <p id="chat-launcher-hint" class="chat-launcher-hint" v-once>我是您的 AI 助理</p>
+    <button ref="chatLauncherEl" type="button" class="chat-launcher" aria-controls="chat-panel"
+            aria-describedby="chat-launcher-hint" aria-label="開啟生活圈 AI 助理"
+            @click="appState.chatOpen = true">
+      <img :src="aiAvatar" alt="">
+    </button>
+  </div>
   <!-- ===== [Jerry 改版：右側手機型 AI 聊天室結束] ===== -->
 </template>

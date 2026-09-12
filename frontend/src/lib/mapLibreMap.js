@@ -14,7 +14,7 @@ import { ensureTransitReachCache, buildDistrictTransitScores } from "./reachabil
 /* [本次移植：原本直接呼叫全域 appVm 的地方，改成呼叫由外部（appState store）
    註冊進來的 controller，避免這個模組要反過來 import store 造成循環依賴。
    controller 需要提供：selectedStartId、chooseStop(id, moveMap)、
-   animationSpeed、animationClock、showTransitStops。] */
+   animationSpeed、animationClock、showBusStops、showMetroStops。] */
 let controller = null;
 export function setMapController(nextController) {
   controller = nextController;
@@ -107,19 +107,29 @@ export function redrawPopulationBars(selectedAges) {
   if (redrawBars) redrawBars(selectedAges);
 }
 
-/* [2026-09-11 新增：整合頁交通圖層清單；切回原 3D 分頁時只隱藏，不更動組員資料] */
-const INTEGRATED_TRANSIT_LAYER_IDS = [
-  "integrated-metro-lines",
-  "integrated-result-lines",
+/* [Jerry 2026-09-13 改版：基礎公車／捷運圖層分組，30 分鐘結果維持獨立。]
+   圖例開關只控制站點與捷運線，不會誤把已計算的可達結果或起點一起關掉。 */
+const INTEGRATED_BUS_LAYER_IDS = [
   "integrated-bus-clusters",
   "integrated-bus-cluster-count",
   "integrated-bus-cluster-hit",
   "integrated-bus-stops",
   "integrated-bus-stop-hit",
-  "integrated-result-points",
+];
+const INTEGRATED_METRO_LAYER_IDS = [
+  "integrated-metro-lines",
   "integrated-metro-stations",
+];
+const INTEGRATED_ANALYSIS_LAYER_IDS = [
+  "integrated-result-lines",
+  "integrated-result-points",
   "integrated-origin-glow",
   "integrated-origin",
+];
+const INTEGRATED_TRANSIT_LAYER_IDS = [
+  ...INTEGRATED_BUS_LAYER_IDS,
+  ...INTEGRATED_METRO_LAYER_IDS,
+  ...INTEGRATED_ANALYSIS_LAYER_IDS,
 ];
 
 /* ===== [2026-09-11 新增：3D 人口圖上的公車／捷運／30 分鐘路網開始] ===== */
@@ -172,15 +182,28 @@ function integratedBaseCollections() {
   };
 }
 
-export function setIntegratedTransitVisibility(visible) {
-  if (!population3dMap || !integratedTransitReady) return;
-  INTEGRATED_TRANSIT_LAYER_IDS.forEach(function (layerId) {
+function setIntegratedLayerGroupVisibility(layerIds, visible) {
+  layerIds.forEach(function (layerId) {
     if (population3dMap.getLayer(layerId)) {
       population3dMap.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
     }
   });
+}
+
+export function setIntegratedTransitVisibility(busVisible, metroVisible) {
+  if (!population3dMap || !integratedTransitReady) return;
+  const showBus = busVisible !== false;
+  const showMetro = metroVisible !== false;
+  setIntegratedLayerGroupVisibility(INTEGRATED_BUS_LAYER_IDS, showBus);
+  setIntegratedLayerGroupVisibility(INTEGRATED_METRO_LAYER_IDS, showMetro);
   const mapElement = document.getElementById("population-3d-map");
-  if (mapElement) mapElement.dataset.transitLayers = visible ? "visible" : "hidden";
+  if (mapElement) {
+    mapElement.dataset.busStops = showBus ? "visible" : "hidden";
+    mapElement.dataset.metroStops = showMetro ? "visible" : "hidden";
+    mapElement.dataset.transitLayers = showBus && showMetro
+      ? "visible"
+      : showBus || showMetro ? "partial" : "hidden";
+  }
 }
 
 function bindIntegratedPointerLayer(layerId) {
@@ -197,7 +220,10 @@ export function ensureIntegratedTransitLayers() {
   ].join("|");
   if (!population3dMap || !population3dBaseReady || !transitNodes.size) return;
   if (integratedTransitReady) {
-    setIntegratedTransitVisibility(controller ? controller.showTransitStops : true);
+    setIntegratedTransitVisibility(
+      controller ? controller.showBusStops : true,
+      controller ? controller.showMetroStops : true,
+    );
     return;
   }
 
@@ -341,7 +367,10 @@ export function ensureIntegratedTransitLayers() {
   integratedTransitReady = true;
   const mapElement = document.getElementById("population-3d-map");
   if (mapElement) mapElement.dataset.transitLayerCount = String(INTEGRATED_TRANSIT_LAYER_IDS.length);
-  setIntegratedTransitVisibility(controller ? controller.showTransitStops : true);
+  setIntegratedTransitVisibility(
+    controller ? controller.showBusStops : true,
+    controller ? controller.showMetroStops : true,
+  );
   if (controller && controller.selectedStartId) drawIntegratedOrigin(transitNodes.get(controller.selectedStartId), false);
 
   population3dMap.on("click", "integrated-bus-cluster-hit", function (event) {
@@ -510,7 +539,10 @@ export async function initPopulation3dMap() {
   if (population3dMap) {
     setTimeout(function () {
       population3dMap.resize();
-      setIntegratedTransitVisibility(controller ? controller.showTransitStops : true);
+      setIntegratedTransitVisibility(
+        controller ? controller.showBusStops : true,
+        controller ? controller.showMetroStops : true,
+      );
     }, 0);
     return;
   }

@@ -106,8 +106,9 @@ export const appState = reactive({
   minuteLimit: 30,
   animationClock: "00:00",
   metrics: { ...EMPTY_METRICS },
-  /* [本次新增：地圖上的公車／捷運站點圖層可開關，預設開啟] */
-  showTransitStops: true,
+  /* [Jerry 2026-09-13 改版：公車站與捷運站圖層分開管理，預設都開啟。] */
+  showBusStops: true,
+  showMetroStops: true,
   /* [本次新增：3D 人口柱圖例（年齡層／可及性）選取狀態，取代原本的年份滑桿；
      ageGroups/colors 是固定常數，直接從地圖模組帶過來給左側面板畫勾選框] */
   legendAgeGroups: AGE_GROUPS,
@@ -122,7 +123,8 @@ export const appState = reactive({
   chatActivity: "",
   chatChips: ["哪裡最適合設點？", "30 分鐘怎麼算？", "幫我看預算方案"],
   chatMessages: [
-    { role: "assistant", text: "嗨，我是生活圈 AI 助理。你可以問我青年熱區、30 分鐘覆蓋或預算配置。" },
+    /* [Jerry 2026-09-13 更新：聊天室首次歡迎訊息。] */
+    { role: "assistant", text: "您好，我是生活圈 AI 助理!\n可以協助了解有關於青年的現階段與未來資訊，例如: 交通可及性、未來青年熱區、潛在問題探討。\n歡迎提出您的疑問!" },
   ],
 
   /* ===== computed（原本 Vue computed，改成 reactive() 物件上的 getter） ===== */
@@ -220,10 +222,11 @@ export const appState = reactive({
   resetPopulationMapView() {
     resetPopulationMapView();
   },
-  /* [本次新增：地圖上的交通標點開關，勾選框直接呼叫這個方法] */
-  toggleTransitStops(visible) {
-    this.showTransitStops = visible;
-    setIntegratedTransitVisibility(visible);
+  /* [Jerry 2026-09-13 改版：兩個勾選框可獨立控制公車與捷運基礎圖層。] */
+  toggleTransitLayer(mode, visible) {
+    if (mode === "bus") this.showBusStops = visible;
+    if (mode === "metro") this.showMetroStops = visible;
+    setIntegratedTransitVisibility(this.showBusStops, this.showMetroStops);
   },
   /* [本次新增：圖例勾選框呼叫這個方法，取代原本切換年份重繪] */
   toggleAgeGroup(age, visible) {
@@ -425,8 +428,8 @@ export const appState = reactive({
         streamingMessage = { role: "assistant", text: "", sources: [], charts: [], tools: [] };
         store.chatMessages.push(streamingMessage);
       }
-      /* 沒有圍籬符號時走快速路徑，不必每個 token 都重跑一次消毒；
-         純文字回覆因此完全不碰 DOMPurify。 */
+      /* 沒有圍籬符號時走快速路徑，不必每個 token 都重跑圖表消毒；
+         assistant 文字會在 ChatWidget 渲染時由 assistantMarkdown.js 統一消毒。 */
       if (full.indexOf("```") === -1) {
         streamingMessage.text = full;
       } else {
@@ -506,7 +509,7 @@ export async function ensureViewReady(view) {
     initPopulation3dMap();
     await appState.loadTransit();
     ensureIntegratedTransitLayers();
-    setIntegratedTransitVisibility(appState.showTransitStops);
+    setIntegratedTransitVisibility(appState.showBusStops, appState.showMetroStops);
   } else if (view === "resources") {
     await Promise.all([
       appState.loadResourceGapData(),

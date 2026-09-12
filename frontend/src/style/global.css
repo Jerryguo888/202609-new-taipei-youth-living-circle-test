@@ -757,26 +757,30 @@
     /* ===== [Jerry 修正：無車可借行政區排行置中放大視窗結束] ===== */
     /* ===== [Jerry 新增：YouBike 公共資源面板結束] ===== */
 
-    /* [本次改版：整頁改成左右兩欄——左欄放托育／交通稀缺率＋死因統計，
-       右欄固定寬度放 YouBike 面板，貼齊在整頁最右邊；寬度不夠時收合成單欄，
-       YouBike 自然掉到最下面。] */
-    /* [本次改版：align-items 從 start 改成 stretch（grid 預設值），讓左欄
-       （托育／交通／死因統計）跟右邊的 YouBike 卡片底部對齊在同一條線上，
-       不會因為兩邊內容量不同，一邊卡片比另一邊短一截。] */
+    /* [Jerry 2026-09-13 固定版面：對照使用者提供的畫面，桌面版固定為
+       「左上兩卡＋左下大卡＋右側 YouBike」；只用 CSS Grid，不提供拖曳或縮放。
+       minmax(0, ...) 讓內層圖表可正常縮小，不會把整頁撐出橫向捲軸。] */
     .resources-layout {
       display: grid;
-      grid-template-columns: 1fr 500px;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 500px);
       align-items: stretch;
       gap: 24px;
     }
 
-    .resource-main-column { display: grid; gap: 14px; }
+    .resources-layout > * { min-width: 0; }
+
+    .resource-main-column {
+      display: grid;
+      min-width: 0;
+      align-content: start;
+      gap: 44px;
+    }
 
     /* [本次改版：托育／交通稀缺率改成並排兩欄（原本學校／停車已刪除時
        曾經收成單欄置中，現在有兩張圖了改回並排，不用置中限寬）] */
     .resource-chart-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
     }
 
@@ -858,24 +862,24 @@
     .resource-chart-value small { margin-left: 2px; color: var(--ink-soft); font-size: .68rem; font-weight: 600; }
 
     /* ===== [本次新增：20~29歲自殺死亡占比排行與完整29區 modal] ===== */
-    .mortality-section { margin-top: 30px; }
+    .mortality-section { min-width: 0; margin-top: 0; }
     .mortality-toolbar { margin-bottom: 14px; }
 
     .mortality-chart-card {
       cursor: pointer;
-      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+      touch-action: manipulation;
+      transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
     }
     .mortality-chart-card:hover {
       border-color: rgba(201, 91, 72, .34);
       box-shadow: 0 16px 38px rgba(31,65,59,.09);
-      transform: translateY(-2px);
     }
     .mortality-chart-card:focus-visible {
       outline: 3px solid rgba(201, 91, 72, .32);
       outline-offset: 4px;
     }
     .mortality-chart-card.is-disabled { cursor: default; }
-    .mortality-chart-card.is-disabled:hover { border-color: var(--line); box-shadow: 0 12px 32px rgba(31,65,59,.055); transform: none; }
+    .mortality-chart-card.is-disabled:hover { border-color: var(--line); box-shadow: 0 12px 32px rgba(31,65,59,.055); }
     .mortality-preview-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 
     .mortality-chart-bars {
@@ -1146,91 +1150,255 @@
     .is-fullscreen-map .legacy-map-shell { height: 100%; border: 0; border-radius: 0; box-shadow: none; }
     .is-fullscreen-map .population-3d-stage.with-transit { height: 100%; min-height: 100vh; }
 
-    /* [本次改版：交通操作面板固定在地圖左側中間偏上的位置；不用 translateY(-50%) 置中，
-       因為那樣收合時上下兩邊會一起往中間縮，看起來像往下收到正中間。改成固定 top，
-       收合時只有下緣往上收，視覺上是「往上收攏」回到固定的頂端位置] */
-    /* [本次改版：青年熱區排行／圖例／交通分析三個原本各自浮動的區塊，
-       改成同一個左側面板裡的三個可收合區塊，堆疊排列、各自獨立展開收合] */
-    .map-side-panel {
+    /* ===== [Jerry 2026-09-12 改版：整合地圖左側控制抽屜開始] =====
+       大面板負責整體滑入／收回；內部只放圖例與 30 分鐘交通，使用 flex 依內容
+       高度排列，避免 details 收合後被 grid 平均撐滿。底色維持深色半透明，讓地圖
+       仍可辨識但不會透出白色區塊。 */
+    .map-control-drawer {
       position: absolute;
       z-index: 6;
-      left: 16px;
-      top: 20px;
-      display: grid;
-      gap: 10px;
-      width: 30%;
-      height: calc(100vh - 30px);
-      padding-right: 10px;
-      overflow: auto;
+      left: 14px;
+      top: 18px;
+      bottom: 18px;
+      width: min(360px, calc(100vw - 76px));
+      pointer-events: none;
+      transform: translateX(calc(-100% - 8px));
+      transition: transform .26s cubic-bezier(.22, 1, .36, 1);
+    }
+
+    .map-control-drawer.is-open { transform: translateX(0); }
+
+    .map-side-panel {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      padding: 10px;
+      overflow: hidden;
+      flex-direction: column;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 20px;
+      background: rgba(8,13,17,.9);
+      color: #f4f7f5;
+      box-shadow: 0 22px 58px rgba(0,0,0,.38);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      pointer-events: auto;
+    }
+
+    .map-side-panel-head {
+      display: flex;
+      min-height: 54px;
+      padding: 7px 8px 10px;
+      flex-direction: column;
+      justify-content: center;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+
+    .map-side-panel-head span {
+      color: #7fdcc7;
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .14em;
+    }
+
+    .map-side-panel-head strong {
+      margin-top: 2px;
+      font-size: 1rem;
+      letter-spacing: -.01em;
+    }
+
+    .map-side-panel-sections {
+      display: flex;
+      min-height: 0;
+      padding: 8px 2px 2px;
+      overflow-y: auto;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(127,220,199,.4) transparent;
+    }
+
+    .map-control-drawer-toggle {
+      position: absolute;
+      left: calc(100% + 8px);
+      top: 12px;
+      display: flex;
+      width: 44px;
+      min-height: 96px;
+      padding: 10px 7px;
+      align-items: center;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 0 14px 14px 0;
+      background: rgba(12,20,23,.94);
+      color: #f4f7f5;
+      box-shadow: 10px 14px 32px rgba(0,0,0,.3);
+      pointer-events: auto;
+      touch-action: manipulation;
+    }
+
+    .map-control-drawer-toggle:hover { background: rgba(24,87,47,.96); }
+    .map-control-drawer-toggle:active { background: #246844; box-shadow: 6px 9px 22px rgba(0,0,0,.28); }
+    .map-control-drawer-toggle:focus-visible { outline: 3px solid #7fdcc7; outline-offset: 3px; }
+
+    .map-control-drawer-toggle svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform .22s ease;
+    }
+
+    .map-control-drawer:not(.is-open) .map-control-drawer-toggle svg { transform: rotate(180deg); }
+
+    .map-control-drawer-toggle span {
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      line-height: 1;
+      writing-mode: vertical-rl;
     }
 
     .side-section {
+      flex: 0 0 auto;
+      overflow: hidden;
       border: 1px solid rgba(255,255,255,.14);
-      border-radius: 16px;
-      background: rgba(17,22,27,.94);
+      border-radius: 13px;
+      background: rgba(25,32,36,.82);
       color: #f4f7f5;
-      box-shadow: 0 16px 42px rgba(0,0,0,.32);
-      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 28px rgba(0,0,0,.2);
     }
 
     .side-section summary {
       display: flex;
+      min-height: 44px;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 13px 15px;
+      gap: 10px;
+      padding: 8px 10px 8px 12px;
       cursor: pointer;
       list-style: none;
-      font-size: 28px;
+      font-size: .94rem;
       font-weight: 780;
+      touch-action: manipulation;
+    }
+
+    .side-section[open] summary {
+      min-height: 46px;
+      padding: 10px 12px 10px 14px;
+      font-size: 1.02rem;
     }
 
     .side-section summary::-webkit-details-marker { display: none; }
-    .side-section summary::after { content: "收合 −"; color: #aebcb7; font-size: .67rem; }
-    .side-section:not([open]) summary::after { content: "展開 ＋"; }
+    .side-section summary:active { background: rgba(127,220,199,.08); }
+    .side-section summary::after {
+      display: grid;
+      width: 26px;
+      height: 26px;
+      flex: 0 0 26px;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(255,255,255,.08);
+      color: #c8d3cf;
+      content: "−";
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .side-section:not([open]) summary::after { content: "+"; }
+    .side-section summary:focus-visible { outline: 3px solid #7fdcc7; outline-offset: -3px; }
 
     .side-section-body {
-      padding: 0 15px 15px;
+      padding: 2px 14px 14px;
       border-top: 1px solid rgba(255,255,255,.09);
     }
 
-    /* [本次新增：青年熱區排行嵌進深色面板後，改用跟交通分析區塊一致的深色配色] */
-    .side-section .forecast-list { display: grid; gap: 12px; padding-top: 14px; }
-    .side-section .forecast-row {
-      display: grid;
-      grid-template-columns: 64px 1fr 34px;
-      align-items: center;
-      gap: 10px;
-      font-size: 20px;
+    /* [Jerry 2026-09-12 調整：收斂圖例密度，保留至少 14px 文字與可點擊標籤。] */
+    .side-section .legend-row { display: flex; align-items: center; gap: 9px; margin: 9px 0; font-size: .875rem; }
+    .side-section .legend-checkbox { width: 18px; height: 18px; flex: 0 0 18px; accent-color: var(--mint); }
+    .side-section .swatch { width: 12px; height: 12px; flex: 0 0 12px; border-radius: 4px; }
+
+    /* ===== [Jerry 2026-09-13 新增：公車／捷運圖層複選控制開始] ===== */
+    .transit-legend-group {
+      min-width: 0;
+      margin: 12px 0 0;
+      padding: 12px 0 0;
+      border: 0;
+      border-top: 1px solid rgba(255,255,255,.09);
     }
-    .side-section .forecast-bar { height: 8px; overflow: hidden; border-radius: 999px; background: #242a2d; }
-    .side-section .forecast-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #45d7c1, #55e6cf); }
-    .side-section .forecast-row strong { color: #55e6cf; text-align: right; }
 
-    /* [本次新增：圖例勾選框整合進面板，沿用原本 population-3d-legend 的樣式] */
-    .side-section .legend-row { display: flex; align-items: center; gap: 8px; margin: 9px 0; font-size: 20px; }
-    .side-section .legend-checkbox { width: 16px; height: 16px; accent-color: var(--mint); }
-    .side-section .swatch { width: 13px; height: 13px; border-radius: 4px; }
-
-    .integrated-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 12px 0; }
-
-    .integrated-mode-tabs button {
-      min-height: 35px;
-      border-radius: 9px;
-      background: #292f32;
-      color: #aab5b1;
-      font-size: 18px;
+    .transit-legend-group legend {
+      float: left;
+      width: 100%;
+      margin: 0 0 9px;
+      padding: 0;
+      color: #bdc8c4;
+      font-size: .8rem;
       font-weight: 760;
     }
 
-    .integrated-mode-tabs button.active { background: #eef2f0; color: #18201e; }
+    .transit-legend-options {
+      display: flex;
+      clear: both;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
 
-    .integrated-field { display: grid; gap: 6px; margin-top: 20px; }
-    .integrated-field > span { color: #aebcb7; font-size: 18px; font-weight: 730; margin-bottom: 10px; }
+    .side-section .legend-row.is-transit {
+      min-height: 44px;
+      min-width: 0;
+      margin: 0;
+      padding: 8px 10px;
+      flex: 1 1 126px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px;
+      background: rgba(36,42,45,.78);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .side-section .legend-row.is-transit:hover { background: rgba(46,56,59,.9); }
+    .side-section .legend-row.is-transit:active { background: rgba(64,82,80,.9); }
+    .side-section .legend-row.is-transit:focus-within { outline: 3px solid rgba(127,220,199,.68); outline-offset: 2px; }
+    .side-section .legend-row.is-transit:has(.legend-checkbox:checked) {
+      border-color: rgba(127,220,199,.52);
+      background: rgba(44,91,78,.55);
+    }
+
+    .side-section .swatch.is-bus { border-radius: 50%; background: #9ba7a3; }
+    .side-section .swatch.is-metro {
+      background: linear-gradient(135deg, #4cc9ff 0 32%, #ffd447 32% 64%, #ff5a89 64% 100%);
+    }
+    /* ===== [Jerry 2026-09-13 新增：公車／捷運圖層複選控制結束] ===== */
+
+    .integrated-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 12px 0; }
+
+    .integrated-mode-tabs button {
+      min-height: 44px;
+      border-radius: 9px;
+      background: #293136;
+      color: #c5cfcb;
+      font-size: .875rem;
+      font-weight: 760;
+      touch-action: manipulation;
+    }
+
+    .integrated-mode-tabs button.active { background: #7fdcc7; color: #10231e; }
+    .integrated-mode-tabs button:active { background: #69cdb6; }
+    .integrated-mode-tabs button:focus-visible { outline: 3px solid #7fdcc7; outline-offset: 2px; }
+
+    .integrated-field { display: grid; gap: 6px; margin-top: 12px; }
+    .integrated-field > span { margin-bottom: 2px; color: #bdc8c4; font-size: .875rem; font-weight: 730; }
     .integrated-field select,
     .integrated-field input {
       width: 100%;
-      min-height: 38px;
+      min-height: 44px;
       padding: 0 10px;
       border: 1px solid rgba(255,255,255,.12);
       border-radius: 9px;
@@ -1238,33 +1406,46 @@
       background: #242a2d;
       color: #f3f6f5;
       font: inherit;
-      font-size: 16px;
+      font-size: .875rem;
     }
+
+    .integrated-field select:focus-visible,
+    .integrated-field input:focus-visible { border-color: #7fdcc7; outline: 3px solid rgba(127,220,199,.24); }
 
     .integrated-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-    .integrated-minute-row { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 4px; color: #aebcb7; font-size: .68rem; }
-    .integrated-minute-row strong { color: #55e6cf; font-size: .78rem; }
+    .integrated-minute-row { display: flex; align-items: center; justify-content: space-between; margin: 13px 0 5px; color: #bdc8c4; font-size: .8rem; }
+    .integrated-minute-row strong { color: #7fdcc7; font-size: .875rem; }
     .side-section-body > input[type="range"] { width: 100%; accent-color: #45d7c1; }
 
     .integrated-run {
       width: 100%;
-      min-height: 42px;
-      margin: 20px 0;
+      min-height: 44px;
+      margin: 14px 0;
       border-radius: 10px;
-      background: #e9efec;
-      color: #18201e;
+      background: #7fdcc7;
+      color: #10231e;
       font-weight: 820;
+      touch-action: manipulation;
     }
 
+    .integrated-run:hover:not(:disabled) { background: #9ae8d6; }
+    .integrated-run:active:not(:disabled) { background: #69cdb6; }
+    .integrated-run:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
     .integrated-run:disabled { opacity: .42; }
 
-    .integrated-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
-    .integrated-metrics div { padding: 8px 4px; border-radius: 9px; background: #242a2d; text-align: center; }
-    .integrated-metrics strong { display: block; color: #fff; font-size: 18px; }
-    .integrated-metrics span { display: block; margin-top: 2px; color: #8f9c98; font-size: .57rem; }
-    .integrated-model-note { margin: 10px 1px 0; color: #99a6a2; font-size: .64rem; line-height: 1.55; }
-    .side-section-body > .map-reset-button { width: 100%; margin-top: 12px; }
+    .integrated-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; }
+    .integrated-metrics div { padding: 9px 6px; border-radius: 9px; background: #242a2d; text-align: center; }
+    .integrated-metrics strong { display: block; color: #fff; font-size: 1rem; }
+    .integrated-metrics span { display: block; margin-top: 3px; color: #aebcb7; font-size: .75rem; }
+    .integrated-model-note { margin: 11px 1px 0; color: #aebcb7; font-size: .75rem; line-height: 1.55; }
+    .side-section-body > .map-reset-button { width: 100%; min-height: 44px; margin-top: 12px; font-size: .875rem; touch-action: manipulation; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .map-control-drawer,
+      .map-control-drawer-toggle svg { transition: none; }
+    }
+    /* ===== [Jerry 2026-09-12 改版：整合地圖左側控制抽屜結束] ===== */
 
     #population-3d-map { position: absolute; inset: 0; }
 
@@ -1307,11 +1488,49 @@
     .population-3d-status.error { color: #ffb4b4; }
 
     /* ===== [Jerry 改版：右側手機型 AI 聊天室開始] ===== */
-    .chat-launcher {
+    /* [Jerry 2026-09-13 新增：提示泡泡和 AI 圓形按鈕共用固定定位容器，
+       確保所有頁面的求助入口都在相同位置。] */
+    .chat-launcher-wrap {
       position: fixed;
       right: 20px;
       bottom: 22px;
       z-index: 2100;
+      display: grid;
+      justify-items: end;
+      gap: 9px;
+    }
+
+    .chat-launcher-hint {
+      position: relative;
+      margin: 0 3px 0 0;
+      padding: 9px 13px;
+      border: 1px solid rgba(24,87,47,.14);
+      border-radius: 14px 14px 4px 14px;
+      background: rgba(255,255,255,.96);
+      color: var(--forest);
+      box-shadow: 0 10px 28px rgba(10,42,28,.18);
+      font-size: .8rem;
+      font-weight: 760;
+      line-height: 1.35;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .chat-launcher-hint::after {
+      position: absolute;
+      right: 8px;
+      bottom: -5px;
+      width: 10px;
+      height: 10px;
+      border-right: 1px solid rgba(24,87,47,.14);
+      border-bottom: 1px solid rgba(24,87,47,.14);
+      background: rgba(255,255,255,.96);
+      content: "";
+      transform: rotate(45deg);
+    }
+
+    .chat-launcher {
+      position: relative;
       width: 64px;
       height: 64px;
       overflow: hidden;
@@ -1457,6 +1676,92 @@
       font-size: 1rem;
       line-height: 1.48;
       white-space: pre-line;
+    }
+
+    /* 只套用在經 DOMPurify 消毒後的 AI Markdown；使用者訊息不會有此 class。 */
+    .message-markdown {
+      overflow-wrap: anywhere;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .message-markdown > :first-child { margin-top: 0; }
+    .message-markdown > :last-child { margin-bottom: 0; }
+
+    .message-markdown p {
+      margin: 0 0 .65em;
+      white-space: normal;
+    }
+
+    .message-markdown h1,
+    .message-markdown h2,
+    .message-markdown h3,
+    .message-markdown h4,
+    .message-markdown h5,
+    .message-markdown h6 {
+      margin: .8em 0 .35em;
+      font-size: 1.02rem;
+      line-height: 1.4;
+    }
+
+    .message-markdown ul,
+    .message-markdown ol {
+      margin: .35em 0 .7em;
+      padding-left: 1.35em;
+    }
+
+    .message-markdown li + li { margin-top: .25em; }
+
+    .message-markdown blockquote {
+      margin: .55em 0;
+      padding-left: .75em;
+      border-left: 3px solid rgba(28,95,56,.35);
+      color: #51625b;
+    }
+
+    .message-markdown code {
+      padding: .12em .32em;
+      border-radius: 5px;
+      background: rgba(28,95,56,.09);
+      font-family: Consolas, "SFMono-Regular", monospace;
+      font-size: .9em;
+    }
+
+    .message-markdown pre {
+      max-width: 100%;
+      margin: .55em 0;
+      padding: 10px;
+      overflow-x: auto;
+      border-radius: 9px;
+      background: #18342a;
+      color: #f4faf6;
+    }
+
+    .message-markdown pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    .message-markdown a {
+      color: #176f4c;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .message-markdown table {
+      display: block;
+      max-width: 100%;
+      margin: .55em 0;
+      overflow-x: auto;
+      border-collapse: collapse;
+    }
+
+    .message-markdown th,
+    .message-markdown td {
+      padding: 5px 7px;
+      border: 1px solid rgba(24,87,47,.16);
+      text-align: left;
     }
 
     /* ===== [2026-09-12 新增：AI 產生的圖表] =====
@@ -1738,13 +2043,117 @@
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
+    /* [Jerry 2026-09-13 資源缺口頁固定桌面版：正常桌面高度時鎖在一個視窗內，
+       不顯示頁面滑桿；左側上下兩列與右側 YouBike 面板共同填滿剩餘高度。
+       窄螢幕仍使用下方既有 RWD 流式版面，避免裁切資料。] */
+    @media (min-width: 1181px) and (min-height: 720px) {
+      .resources-view {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        width: auto;
+        height: 100dvh;
+        min-height: 0;
+        margin: 0;
+        overflow: hidden;
+        grid-template-rows: auto minmax(0, 1fr);
+        padding: 0 max(14px, calc((100vw - 1600px) / 2)) 16px;
+      }
+
+      .resources-view .resource-page-title { padding: 22px 0 6px; }
+
+      .resources-view .module-body {
+        min-height: 0;
+        overflow: hidden;
+        padding: 14px 0 0;
+      }
+
+      .resources-view .resources-layout { height: 100%; min-height: 0; }
+
+      .resources-view .resource-main-column {
+        min-height: 0;
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+      }
+
+      .resources-view .resource-chart-grid,
+      .resources-view .mortality-section { min-height: 0; }
+
+      .resources-view .resource-chart-grid > .resource-chart-card,
+      .resources-view .mortality-section > .resource-chart-card {
+        display: flex;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+        flex-direction: column;
+        padding: 18px 20px;
+      }
+
+      .resources-view .resource-chart-title p { margin: 4px 0 12px; line-height: 1.5; }
+      .resources-view .resource-chart-legend { margin: -2px 0 10px; }
+      .resources-view .resource-chart-bars { flex: 1; align-content: center; gap: 9px; }
+      .resources-view .mortality-chart-bars { flex: 1; align-content: space-evenly; gap: 8px; }
+
+      .resources-view .mortality-chart-footer {
+        margin-top: 12px;
+        padding-top: 10px;
+      }
+
+      .resources-view .youbike-board {
+        display: flex;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+        flex-direction: column;
+        padding: 18px 22px;
+      }
+
+      .resources-view .youbike-board-head { margin-bottom: 10px; }
+
+      .resources-view .youbike-stat-grid {
+        min-height: 0;
+        flex: 0 0 min(30vh, 240px);
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .resources-view .youbike-stat-card {
+        min-height: 0;
+        padding: 14px 20px;
+      }
+
+      .resources-view .youbike-stat-card p { margin-bottom: 12px; }
+      .resources-view .youbike-stat-card strong { font-size: 40px; }
+
+      .resources-view .youbike-ranking-card {
+        display: flex;
+        min-height: 0;
+        margin-top: 8px;
+        padding: 16px 20px;
+        flex: 1;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .resources-view .youbike-ranking-head { margin-bottom: 14px; }
+      .resources-view .youbike-ranking-list { gap: 10px; }
+    }
+
+    /* [Jerry 2026-09-13 固定版面 RWD：桌面維持參考圖三欄視覺；空間不足時
+       直接改成上下排列，避免硬塞欄寬、橫向拖動或裁掉資料。] */
+    @media (max-width: 1180px) {
+      .resources-layout { grid-template-columns: minmax(0, 1fr); }
+      .resource-main-column { gap: 24px; }
+      .youbike-board { width: 100%; }
+    }
+
     @media (max-width: 820px) {
       .page-container { width: min(100% - 18px, 1600px); }
       .nav-orb-wrap { left: 14px; bottom: 14px; }
       .home-launch { align-items: flex-start; }
       .home-copy { padding-top: 92px; }
       .home-title { font-size: clamp(3.2rem, 16vw, 5rem); }
-      .resources-layout { grid-template-columns: 1fr; }
+      .resources-layout { grid-template-columns: minmax(0, 1fr); }
       .resource-chart-grid { grid-template-columns: 1fr; }
       .mortality-section { max-width: none; }
       .resource-chart-row { grid-template-columns: 56px 1fr 60px; }
@@ -1765,7 +2174,16 @@
       .legacy-map-body { padding: 10px; }
       .population-3d-stage { min-height: 70vh; }
       .population-3d-stage.with-transit { height: 86vh; min-height: 720px; }
-      .map-side-panel { left: 10px; width: calc(100% - 20px); max-height: calc(100% - 210px); }
+      /* [Jerry 2026-09-12 新增：手機版保留左側抽屜把手，面板不超出可視寬度。] */
+      .map-control-drawer {
+        left: 8px;
+        top: 10px;
+        bottom: 10px;
+        width: min(340px, calc(100vw - 64px));
+      }
+      .map-control-drawer { transform: translateX(calc(-100% - 6px)); }
+      .map-control-drawer.is-open { transform: translateX(0); }
+      .map-control-drawer-toggle { left: calc(100% + 6px); }
     }
 
     @media (max-width: 520px) {
@@ -1788,7 +2206,9 @@
       .youbike-zero-panel-tools { padding: 12px; }
       .youbike-zero-district-list { padding: 7px 8px 12px; }
       .youbike-zero-district-list li { grid-template-columns: 24px 54px minmax(54px, 1fr) 44px; gap: 7px; padding: 12px 9px; }
-      .chat-launcher { right: 14px; bottom: 16px; width: 60px; height: 60px; }
+      .chat-launcher-wrap { right: 14px; bottom: 16px; gap: 8px; }
+      .chat-launcher-hint { margin-right: 2px; padding: 8px 11px; font-size: .76rem; }
+      .chat-launcher { width: 60px; height: 60px; }
       .chat-panel { inset: 6px; width: auto; border-radius: 24px; }
       .chat-header { min-height: 54px; padding: 7px 8px 7px 15px; }
       .chat-header strong { font-size: 1rem; }
