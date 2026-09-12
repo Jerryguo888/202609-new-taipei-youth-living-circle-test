@@ -230,7 +230,7 @@ onBeforeUnmount(function () {
                   </strong>
                 </div>
                 <p id="mortality-chart-description">
-                  各行政區自殺死亡數占同齡全部死因死亡數的比例；點擊圖表查看全部29區。
+                  各行政區自殺死亡數占同齡全部死因死亡數的比例。
                 </p>
               </div>
               <p v-if="appState.mortalityLoading" class="resource-chart-status">
@@ -298,7 +298,7 @@ onBeforeUnmount(function () {
             </ol>
             <p v-else class="youbike-ranking-empty">{{ youbikeLoading ? "正在統計 29 區站點…" : "目前沒有排行資料" }}</p>
             <div v-if="!youbikeLoading && youbikeData.allZeroDistricts.length" class="mortality-chart-footer">
-              <p id="youbike-ranking-description">無車可借場站數＝該區目前可借車輛為 0 的場站數</p>
+              <p id="youbike-ranking-description">無車可借場站數＝該區目前可借車輛為 0 的場站數。</p>
               <span>查看全部29區</span>
             </div>
           </article>
@@ -314,18 +314,16 @@ onBeforeUnmount(function () {
               <header class="youbike-zero-panel-head">
                 <div>
                   <h2 id="youbike-zero-panel-title">無車可借場站數</h2>
+                  <p id="mortality-chart-description">
+                    各行政區自殺死亡數占同齡全部死因死亡數的比例。
+                  </p>
                 </div>
                 <div class="youbike-zero-panel-actions">
                   <button type="button" class="is-close" @click="closeZeroDistrictPanel">x</button>
                 </div>
               </header>
-              <!-- <div class="youbike-zero-panel-tools">
-                <strong>調度提醒</strong>
-                <p>依可借車輛為 0 的場站數由高到低排序；0 站代表目前沒有觀察到無車可借的場站。</p>
-              </div> -->
               <ul class="youbike-zero-district-list">
-                <li v-for="(row, index) in youbikeData.allZeroDistricts" :key="row.district" :class="{ 'is-zero': row.count === 0 }">
-                  <!-- <span class="youbike-zero-district-rank">{{ String(index + 1).padStart(2, "0") }}</span> -->
+                <li v-for="row in youbikeData.allZeroDistricts" :key="row.district" :class="{ 'is-zero': row.count === 0 }">
                   <strong>{{ row.district }}</strong>
                   <span class="youbike-zero-district-track" aria-hidden="true">
                     <i :style="{ width: row.widthPercent + '%' }"></i>

@@ -41,6 +41,55 @@ export const NEW_TAIPEI_MAX_BOUNDS = [
    z8.7，所以下限取 8：夠低不會擋住 fitBounds，又不會讓使用者縮到看見全世界。 */
 export const NEW_TAIPEI_MIN_ZOOM = 8;
 
+/* [本次新增：地圖預設鏡位改成定位在板橋區，不再是套整個新北市 bounds 的置中。
+   座標沿用 appState.js 選預設起點站時已經在用的板橋座標，全站統一同一個點。
+   [實測修正：原本用 zoom 10（跟以前 fitBounds 整個新北市時差不多的縮放），
+   但板橋離 NEW_TAIPEI_MAX_BOUNDS 的西邊界（121.20）不夠遠——在寬螢幕、
+   pitch 55 的鏡位下，以 zoom 10 置中板橋所需要看到的西側範圍會超出
+   maxBounds，MapLibre 會自動把 center 往東修正，修正後的座標跟請求的完全
+   不同（而且修正量會隨畫面寬度變動，不可預期）。這對「置中板橋」跟「再往
+   右挪一點」兩件事都造成很怪的連鎖效應，實測甚至出現鏡位暴衝、跳到宜蘭
+   外海的離譜結果。改成 zoom 11：可視範圍縮小，板橋到西邊界就有足夠空間，
+   不會再觸發 maxBounds 修正，置中跟位移才會照預期運作。] */
+const BANQIAO_CENTER = [121.4639, 25.0142];
+const BANQIAO_DEFAULT_ZOOM = 11;
+
+/* 左側面板（青年熱區排行／圖例／交通分析）浮在地圖左側，寬度是容器的 30%，
+   如果直接把板橋設成畫面正中央，視覺上會偏左（被面板蓋住一塊）。
+   [實測修正：CameraOptions.padding／AnimationOptions.offset 這兩個 MapLibre
+   內建的位移選項，語意上都應該能把 center 移到畫面非正中央的位置，但只要
+   前面提到的 maxBounds 修正一起發生，兩者都會算歪（因為它們是在「MapLibre
+   已經因為 maxBounds 修正過一次 center」之後才疊加位移，兩次修正互相干擾）。
+   改成完全不依賴這兩個選項：先把板橋設成畫面正中央（zoom 11 之後這一步
+   本身就很單純可靠），再用 project()／unproject() 自己算出「要把哪個地理
+   座標放在正中央，才能讓板橋落在正中央往右挪一段距離的位置」，最後只是
+   一般的 center 改變（沒有 offset／padding）——這條路徑跟使用者拖曳地圖是
+   同一套邏輯。手機版面板會變成幾乎全寬的收合選單，不適用同一招，直接
+   當作沒有側欄。 */
+function getBanqiaoSidePanelShiftX() {
+  if (window.innerWidth <= 820) return 0;
+  const panel = document.querySelector(".map-side-panel");
+  const panelWidth = panel ? panel.getBoundingClientRect().width : 0;
+  return panelWidth ? panelWidth / 2 + 8 : 0;
+}
+
+/* [本次改版：算出「板橋往右挪一段距離」實際對應的地理座標，內部會暫時
+   把鏡位跳到板橋（不套任何位移）算完 project／unproject 後再跳回呼叫前
+   的原始鏡位——因為是同步、瞬間跳兩次，畫面根本來不及重繪，使用者不會
+   看到中間這一格，呼叫端拿到座標後再自己接一次平滑的 easeTo 到最終位置，
+   zoom／pitch／bearing 一樣會平滑過渡，不會有「先瞬間跳定位、只有最後
+   一小段位移用動畫」的割裂感。] */
+function computeBanqiaoShiftedCenter(map) {
+  const shiftX = getBanqiaoSidePanelShiftX();
+  if (!shiftX) return BANQIAO_CENTER;
+  const original = { center: map.getCenter(), zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() };
+  map.jumpTo({ center: BANQIAO_CENTER, zoom: BANQIAO_DEFAULT_ZOOM, pitch: 55, bearing: -10 });
+  const screenPoint = map.project(BANQIAO_CENTER);
+  const shifted = map.unproject([screenPoint.x - shiftX, screenPoint.y]);
+  map.jumpTo(original);
+  return [shifted.lng, shifted.lat];
+}
+
 export let population3dMap = null;
 let population3dLoading = false;
 export let population3dBaseReady = false;
@@ -437,14 +486,17 @@ export function animateIntegratedResult(result) {
 }
 /* ===== [2026-09-11 新增：3D 人口圖上的公車／捷運／30 分鐘路網結束] ===== */
 
+/* [本次改版：重置鏡位改成回到板橋區定位（跟預設鏡位一致），不再是套整個
+   新北市 bounds 置中——這樣使用者拖走／縮放後按重置，會回到跟剛進頁面
+   時同一個板橋定位，而不是每次都跳回城市置中。] */
 export function resetPopulationMapView() {
-  if (!population3dMap || !population3dBounds) return;
-  /* 先還原俯角與方位，再依同一鏡位計算完整 bounds；避免第二段動畫蓋掉縮放。 */
-  population3dMap.jumpTo({ pitch: 55, bearing: -10 });
-  population3dMap.fitBounds(population3dBounds, {
-    padding: window.innerWidth <= 820 ? 34 : 70,
+  if (!population3dMap) return;
+  population3dMap.easeTo({
+    center: computeBanqiaoShiftedCenter(population3dMap),
+    zoom: BANQIAO_DEFAULT_ZOOM,
+    pitch: 55,
+    bearing: -10,
     duration: 650,
-    maxZoom: 10,
   });
 }
 
@@ -620,8 +672,8 @@ export async function initPopulation3dMap() {
           },
         }],
       },
-      center: [121.56, 25.04],
-      zoom: 8.6,
+      center: BANQIAO_CENTER,
+      zoom: BANQIAO_DEFAULT_ZOOM,
       pitch: 55,
       bearing: -10,
       antialias: true,
@@ -675,13 +727,14 @@ export async function initPopulation3dMap() {
           "text-halo-width": 1.5,
         },
       });
-      population3dMap.fitBounds(bounds, {
-        padding: window.innerWidth <= 820 ? 34 : 70,
-        duration: 0,
-        maxZoom: 10,
+      /* [本次改版：預設鏡位改成定位在板橋區，不再套用整個新北市 bounds
+         （這樣才不會每次載入或按重置都跳回城市置中，蓋掉板橋定位）] */
+      population3dMap.jumpTo({
+        center: computeBanqiaoShiftedCenter(population3dMap),
+        zoom: BANQIAO_DEFAULT_ZOOM,
+        pitch: 55,
+        bearing: -10,
       });
-      population3dMap.setPitch(55);
-      population3dMap.setBearing(-10);
 
       /* [2026-09-11 新增：若交通網路已完成，立刻疊到這張 3D 圖] */
       ensureIntegratedTransitLayers();
