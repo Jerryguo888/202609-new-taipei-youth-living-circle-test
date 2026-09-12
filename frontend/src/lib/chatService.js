@@ -24,8 +24,16 @@ export const CHAT_SERVICE = Object.freeze({
   endpoint: CHAT_ENDPOINT,
 });
 
-/* 後端沒回應時的等待上限。設有上限才不會讓輸入框一直卡在「回覆中」。 */
-const REQUEST_TIMEOUT_MS = 30000;
+/* 後端沒回應時的等待上限。設有上限才不會讓輸入框一直卡在「回覆中」。
+
+   這個值必須是整條逾時鏈裡最寬鬆的一環，否則前端會先 abort，畫面上只剩一句
+   「聊天服務暫時無法使用」，而後端其實正要回一個講得清楚的原因。
+   目前是：boto3 read_timeout 60s < nginx proxy_read_timeout 120s < 這裡 150s。
+
+   30 秒是舊值，逐字串流時很安全（第一個 token 通常 2~3 秒就到，之後 chunk 持續
+   進來）。改成收完才送之後，這段等待變成「工具往返 + 完整生成」的總和，
+   30 秒會砍掉合法的長回答。 */
+const REQUEST_TIMEOUT_MS = 150000;
 
 export function localChatReply(text) {
   const query = text.toLowerCase();
@@ -77,7 +85,6 @@ function createSseParser(onEvent) {
  * @param {object} context 目前畫面狀態 { activeView, minuteLimit }
  * @param {object} [options]
  * @param {Array}  [options.history] 先前的對話 [{ role, text }]
- * @param {Function} [options.onDelta] 有值時逐字回呼，用來做打字機效果
  * @param {Function} [options.onTool] 模型開始讀某份資料時回呼，用來顯示「正在查詢…」
  * @returns {Promise<{ text: string, sources: Array, tools: Array, fallback: boolean }>}
  */
@@ -123,8 +130,9 @@ export async function getChatReply(text, context, options) {
 
     const parser = createSseParser(function (event) {
       if (event.text) {
-        full += event.text;
-        if (settings.onDelta) settings.onDelta(event.text, full);
+        /* 後端在收完整段輸出後才送一個 text 事件，所以這裡是賦值而不是累加。
+           打字機動畫由 appState 拿到定稿後自己跑。 */
+        full = event.text;
       } else if (event.tool) {
         /* 模型自己決定要讀哪份資料時後端會送這個事件，
            拿來即時更新「正在查詢…」的狀態。 */
@@ -148,7 +156,7 @@ export async function getChatReply(text, context, options) {
     parser.flush();
 
     /* 後端把 Bedrock 的錯誤當事件送回來。完全沒有文字才算失敗，
-       已經串出一部分的話就保留那段內容，只是附註錯誤。 */
+       模型已經講了一部分（例如撞到工具輪數上限）就保留那段內容，只附註錯誤。 */
     if (!full && streamError) throw new Error(streamError);
 
     return {

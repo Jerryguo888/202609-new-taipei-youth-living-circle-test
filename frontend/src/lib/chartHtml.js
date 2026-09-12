@@ -116,10 +116,9 @@ function hasStructuralTag(html) {
  * 把回覆拆成「散文」與「圖表」兩部分。
  *
  * @param {string} raw 模型回覆原文
- * @param {boolean} streaming 是否還在串流中
  * @returns {{ text: string, charts: string[] }}
  */
-export function splitChartBlocks(raw, streaming) {
+export function splitChartBlocks(raw) {
   if (!raw) return { text: "", charts: [] };
 
   const charts = [];
@@ -129,10 +128,11 @@ export function splitChartBlocks(raw, streaming) {
     return "";
   });
 
-  /* 串流中途會出現還沒收尾的圍籬。直接顯示會是一堆生 HTML 標記，
-     所以先切掉並給一個提示，等收尾後再正式渲染成圖表。 */
+  /* 模型偶爾會把圍籬寫壞（開了沒收），那段內容直接切掉。留著會是一堆生 HTML
+     標記，而 message-markdown 那條路徑不會把它們渲染成圖表。
+     以前這裡還要處理「串流到一半的圍籬」，現在文字是收完才送，不需要了。 */
   if (UNCLOSED_FENCE.test(text)) {
-    text = text.replace(UNCLOSED_FENCE, streaming ? "\n（正在繪製圖表…）" : "");
+    text = text.replace(UNCLOSED_FENCE, "");
   }
 
   return { text: text.replace(/\n{3,}/g, "\n\n").trim(), charts: charts };
