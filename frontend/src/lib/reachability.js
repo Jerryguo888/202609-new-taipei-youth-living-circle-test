@@ -7,6 +7,11 @@ import {
   metroTransferMinutes,
   ensureOriginSeedIndex,
 } from "./network.js";
+import {
+  ensureMapCacheLifecycle,
+  MAP_CACHE_CLEARED_EVENT,
+  TRANSIT_REACH_CACHE_VERSION,
+} from "./data/browserCache.js";
 
 /* [本次修正：把步行可達的同名對向站牌視為同一個起點群組]
    公車站序仍維持單向，僅補足人在起點可過街搭乘另一方向的真實行為。 */
@@ -176,9 +181,114 @@ let transitReachCachePromise = null;
 let districtStationTotals = null;
 let districtReachSampleCounts = null;
 
+/* [Jerry 2026-09-13 新增：30 分鐘抽樣計算結果的本機快取]
+   內容只有約 29 區 × 每區最多 8 站的數值，適合存 localStorage；版本、出發時間、
+   節點數任一不符就重算；離開網站 30 分鐘後由 browserCache.js 統一清除。 */
+let transitReachCacheDepartureTime = "";
+let transitReachCachePromiseDepartureTime = "";
+let transitReachCacheGeneration = 0;
+
+function normalizedDepartureTime(value) {
+  return String(value || "08:00").trim() || "08:00";
+}
+
+function transitReachStorageKey(departureTime) {
+  return TRANSIT_REACH_CACHE_VERSION + ":" + departureTime;
+}
+
+function restoreTransitReachCache(departureTime) {
+  try {
+    const key = transitReachStorageKey(departureTime);
+    const raw = globalThis.localStorage?.getItem(key);
+    if (!raw) return null;
+    const stored = JSON.parse(raw);
+    const invalid = stored.version !== TRANSIT_REACH_CACHE_VERSION
+      || stored.departureTime !== departureTime
+      || stored.nodeCount !== transitNodes.size
+      || !Array.isArray(stored.reach)
+      || !Array.isArray(stored.totals)
+      || !Array.isArray(stored.sampleCounts)
+      || stored.reach.some(function (entry) { return !Array.isArray(entry) || !transitNodes.has(entry[0]); });
+    if (invalid) {
+      globalThis.localStorage?.removeItem(key);
+      return null;
+    }
+    return {
+      reach: new Map(stored.reach),
+      totals: new Map(stored.totals),
+      sampleCounts: new Map(stored.sampleCounts),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function persistTransitReachCache(departureTime, cache, totals, sampleCounts) {
+  try {
+    globalThis.localStorage?.setItem(transitReachStorageKey(departureTime), JSON.stringify({
+      version: TRANSIT_REACH_CACHE_VERSION,
+      savedAt: Date.now(),
+      departureTime: departureTime,
+      nodeCount: transitNodes.size,
+      reach: Array.from(cache.entries()),
+      totals: Array.from(totals.entries()),
+      sampleCounts: Array.from(sampleCounts.entries()),
+    }));
+  } catch (error) {
+    /* 無痕模式或容量不足時維持原本記憶體快取，不影響地圖功能。 */
+  }
+}
+
+/* [Jerry 2026-09-13 新增：離站逾時清除時，同步丟掉本分頁的記憶體計算結果。] */
+function resetTransitReachMemoryCache() {
+  transitReachCacheGeneration += 1;
+  transitReachCache = null;
+  transitReachCachePromise = null;
+  districtStationTotals = null;
+  districtReachSampleCounts = null;
+  transitReachCacheDepartureTime = "";
+  transitReachCachePromiseDepartureTime = "";
+}
+
+if (typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener(MAP_CACHE_CLEARED_EVENT, resetTransitReachMemoryCache);
+}
+
 export function ensureTransitReachCache(onProgress, departureTime) {
-  if (transitReachCache) return Promise.resolve(transitReachCache);
-  if (transitReachCachePromise) return transitReachCachePromise;
+  return ensureMapCacheLifecycle().then(function () {
+    return ensureTransitReachCacheReady(onProgress, departureTime);
+  });
+}
+
+function ensureTransitReachCacheReady(onProgress, departureTime) {
+  const requestedDepartureTime = normalizedDepartureTime(departureTime);
+  if (transitReachCache && transitReachCacheDepartureTime === requestedDepartureTime) {
+    return Promise.resolve(transitReachCache);
+  }
+  if (transitReachCachePromise && transitReachCachePromiseDepartureTime === requestedDepartureTime) {
+    return transitReachCachePromise;
+  }
+  if (transitReachCachePromise) {
+    return transitReachCachePromise.then(function () {
+      return ensureTransitReachCacheReady(onProgress, requestedDepartureTime);
+    });
+  }
+
+  const restored = restoreTransitReachCache(requestedDepartureTime);
+  if (restored) {
+    transitReachCache = restored.reach;
+    districtStationTotals = restored.totals;
+    districtReachSampleCounts = restored.sampleCounts;
+    transitReachCacheDepartureTime = requestedDepartureTime;
+    if (onProgress) onProgress(restored.reach.size, restored.reach.size);
+    return Promise.resolve(transitReachCache);
+  }
+
+  transitReachCache = null;
+  districtStationTotals = null;
+  districtReachSampleCounts = null;
+  transitReachCachePromiseDepartureTime = requestedDepartureTime;
+  const cacheGeneration = transitReachCacheGeneration;
   transitReachCachePromise = new Promise(function (resolve) {
     const cache = new Map();
     const totals = new Map();
@@ -202,10 +312,15 @@ export function ensureTransitReachCache(onProgress, departureTime) {
     });
     let index = 0;
     function step() {
+      /* 離站逾時時停止尚未完成的背景運算，避免清除後又把舊結果寫回。 */
+      if (cacheGeneration !== transitReachCacheGeneration) {
+        resolve(new Map());
+        return;
+      }
       const chunkEnd = Math.min(index + 4, ids.length);
       for (; index < chunkEnd; index++) {
         const id = ids[index];
-        cache.set(id, computeReachability(id, 30, departureTime).reached.length);
+        cache.set(id, computeReachability(id, 30, requestedDepartureTime).reached.length);
       }
       if (onProgress) onProgress(index, ids.length);
       if (index < ids.length) {
@@ -214,6 +329,10 @@ export function ensureTransitReachCache(onProgress, departureTime) {
         transitReachCache = cache;
         districtStationTotals = totals;
         districtReachSampleCounts = sampleCounts;
+        transitReachCacheDepartureTime = requestedDepartureTime;
+        persistTransitReachCache(requestedDepartureTime, cache, totals, sampleCounts);
+        transitReachCachePromise = null;
+        transitReachCachePromiseDepartureTime = "";
         resolve(cache);
       }
     }

@@ -121,7 +121,7 @@ export const appState = reactive({
   chatChips: ["哪裡最適合設點？", "30 分鐘怎麼算？", "幫我看預算方案"],
   chatMessages: [
     /* [Jerry 2026-09-13 更新：聊天室首次歡迎訊息。] */
-    { role: "assistant", text: "您好，我是生活圈 AI 助理!\n可以協助了解有關於青年的現階段與未來資訊，\n例如: 交通可及性、未來青年熱區、潛在問題探討。\n歡迎提出您的疑問!" },
+    { role: "assistant", text: "您好，我是生活圈 AI 助理!\n可以協助了解有關於青年的現階段與未來資訊，例如: 交通可及性、未來青年熱區、潛在問題探討。\n歡迎提出您的疑問!" },
   ],
 
   /* ===== computed（原本 Vue computed，改成 reactive() 物件上的 getter） ===== */
