@@ -27,6 +27,7 @@ import {
 } from "../lib/mapLibreMap.js";
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
 import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
+import { estimateTransitGapRows } from "../lib/transitGap.js";
 import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
 
 const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—" };
@@ -73,6 +74,10 @@ export const appState = reactive({
   childcareGapLoaded: false,
   childcareGapLoading: false,
   childcareGapStatus: "托育缺口資料待載入",
+  /* [整合保留：交通稀缺率與健康指標各自有獨立載入狀態，互不覆蓋] */
+  transitGapLoaded: false,
+  transitGapLoading: false,
+  transitGapStatus: "交通稀缺率資料待載入",
   /* [本次新增：死因統計使用獨立狀態，不影響既有托育缺口資料與錯誤處理] */
   mortalityLoaded: false,
   mortalityLoading: false,
@@ -160,6 +165,13 @@ export const appState = reactive({
         allRows: sorted.map(mapRow),
       };
     }, this);
+  },
+  /* [整合修正：組員健康指標加入後仍保留托育／交通兩張卡各自的載入狀態] */
+  get resourceGapLoadingInfo() {
+    return {
+      childcare: { loading: this.childcareGapLoading, status: this.childcareGapStatus },
+      transit: { loading: this.transitGapLoading, status: this.transitGapStatus },
+    };
   },
   /* [本次新增：完整排行保留在 mortalityRows，首頁卡片只取排序後前五名] */
   get mortalityTop5Rows() {
@@ -250,6 +262,23 @@ export const appState = reactive({
       this.childcareGapStatus = "資料載入失敗。" + dataLoadHint();
     } finally {
       this.childcareGapLoading = false;
+    }
+  },
+  /* [整合保留：交通稀缺率與青年健康指標同時存在，避免合併時互相取代] */
+  async loadTransitGapData() {
+    if (this.transitGapLoaded || this.transitGapLoading) return;
+    this.transitGapLoading = true;
+    this.transitGapStatus = "讀取路網與可達性資料…";
+    try {
+      const rows = await estimateTransitGapRows();
+      this.resourceGaps.transit.rows = rows;
+      this.transitGapLoaded = true;
+      this.transitGapStatus = "";
+    } catch (error) {
+      console.error(error);
+      this.transitGapStatus = "資料載入失敗。" + dataLoadHint();
+    } finally {
+      this.transitGapLoading = false;
     }
   },
   /* [本次新增：死因統計獨立載入；失敗時不會清空或遮蔽既有托育圖表] */
@@ -364,7 +393,11 @@ export async function ensureViewReady(view) {
     ensureIntegratedTransitLayers();
     setIntegratedTransitVisibility(appState.showTransitStops);
   } else if (view === "resources") {
-    await appState.loadResourceGapData();
-    await appState.loadMortalityData();
+    /* [整合修正：三種資料並行載入，任一功能不會阻塞或覆蓋另外兩種] */
+    await Promise.all([
+      appState.loadResourceGapData(),
+      appState.loadTransitGapData(),
+      appState.loadMortalityData(),
+    ]);
   }
 }

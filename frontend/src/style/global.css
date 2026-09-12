@@ -449,7 +449,7 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .youbike-stat-card > span {
+    .youbike-stat-unit {
       position: relative;
       z-index: 1;
       margin-left: 7px;
@@ -465,11 +465,33 @@
     }
 
     .youbike-ranking-card {
+      width: 100%;
       margin-top: 12px;
       padding: clamp(18px, 3vw, 30px);
+      border: 0;
       border-radius: 25px;
+      appearance: none;
       background: #eef0ed;
       color: #171a18;
+      font: inherit;
+      text-align: left;
+    }
+
+    /* [Jerry 修正：完整排行由這張 Top 5 卡片開啟。] */
+    .youbike-ranking-card.is-action {
+      cursor: pointer;
+      transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+    }
+
+    .youbike-ranking-card.is-action:hover {
+      transform: translateY(-2px);
+      background: #f5f7f4;
+      box-shadow: 0 14px 32px rgba(0,0,0,.18);
+    }
+
+    .youbike-ranking-card.is-action:focus-visible {
+      outline: 3px solid #f4bf22;
+      outline-offset: 3px;
     }
 
     .youbike-ranking-head {
@@ -567,6 +589,166 @@
     @keyframes youbike-loading {
       to { background-position: -220% 0; }
     }
+
+    /* ===== [Jerry 修正：無車可借行政區排行置中放大視窗開始] =====
+       點擊後直接在畫面中央顯示完整大視窗，不保留放大／縮小切換；排行獨立捲動。 */
+    body.has-youbike-zero-panel { overflow: hidden; }
+
+    .youbike-zero-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 3200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(3, 7, 9, .56);
+      backdrop-filter: blur(3px);
+    }
+
+    .youbike-zero-panel {
+      display: flex;
+      width: min(900px, calc(100vw - 36px));
+      height: min(820px, calc(100dvh - 36px));
+      min-height: 0;
+      margin: 0;
+      overflow: hidden;
+      flex-direction: column;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 24px;
+      outline: 0;
+      background: #11161b;
+      color: #f4f7f5;
+      box-shadow: 0 26px 90px rgba(0,0,0,.48);
+    }
+
+    .youbike-zero-panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 18px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+    }
+
+    .youbike-zero-panel-head p {
+      margin: 0 0 5px;
+      color: #8fa099;
+      font-size: .64rem;
+      font-weight: 780;
+      letter-spacing: .1em;
+    }
+
+    .youbike-zero-panel-head h2 { margin: 0; font-size: 1.3rem; letter-spacing: -.03em; }
+
+    .youbike-zero-panel-actions { display: flex; flex: 0 0 auto; gap: 7px; }
+
+    .youbike-zero-panel-actions button {
+      min-height: 32px;
+      padding: 0 11px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      background: #242a2d;
+      color: #dce4df;
+      font-size: .68rem;
+      font-weight: 760;
+    }
+
+    .youbike-zero-panel-actions button:hover { background: #30383a; }
+    .youbike-zero-panel-actions button.is-close { background: #e9efec; color: #18201e; }
+
+    .youbike-zero-panel-tools {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+    }
+
+    .youbike-zero-panel-tools > strong {
+      display: block;
+      margin-bottom: 7px;
+      color: #dce4df;
+      font-size: .78rem;
+      font-weight: 780;
+    }
+
+    .youbike-zero-panel-tools p {
+      margin: 8px 1px 0;
+      color: #82908a;
+      font-size: .65rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-zero-district-list {
+      display: grid;
+      min-height: 0;
+      margin: 0;
+      padding: 10px 12px 18px;
+      overflow-y: auto;
+      align-content: start;
+      gap: 7px;
+      list-style: none;
+      scrollbar-width: thin;
+      scrollbar-color: #46524d transparent;
+    }
+
+    .youbike-zero-district-list li {
+      display: grid;
+      grid-template-columns: 30px 62px minmax(70px, 1fr) 50px;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 11px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      background: #181e22;
+    }
+
+    .youbike-zero-district-rank {
+      color: #6f7e77;
+      font-size: .68rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-zero-district-list li > strong {
+      color: #55e6cf;
+      font-size: .78rem;
+    }
+
+    .youbike-zero-district-track {
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #2b3331;
+    }
+
+    .youbike-zero-district-track i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #55e6cf, #f4bf22);
+    }
+
+    .youbike-zero-district-list li.is-zero { background: #151a1e; }
+    .youbike-zero-district-list li.is-zero > strong,
+    .youbike-zero-district-list li.is-zero > b { color: #87958f; }
+
+    .youbike-zero-district-list li > b {
+      color: #f4f7f5;
+      font-size: .95rem;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-zero-district-list li > b small { margin-left: 3px; color: #87958f; font-size: .62rem; }
+
+    .youbike-panel-enter-active,
+    .youbike-panel-leave-active { transition: opacity .2s ease; }
+    .youbike-panel-enter-active .youbike-zero-panel,
+    .youbike-panel-leave-active .youbike-zero-panel { transition: transform .22s ease, opacity .2s ease; }
+    .youbike-panel-enter-from,
+    .youbike-panel-leave-to { opacity: 0; }
+    .youbike-panel-enter-from .youbike-zero-panel,
+    .youbike-panel-leave-to .youbike-zero-panel { opacity: 0; transform: translateY(18px) scale(.97); }
+    /* ===== [Jerry 修正：無車可借行政區排行置中放大視窗結束] ===== */
     /* ===== [Jerry 新增：YouBike 公共資源面板結束] ===== */
 
     /* ===== [本次改版：資源缺口頁只剩托育一張稀缺率疊圖（學校／停車已刪除），
@@ -1277,8 +1459,15 @@
       .youbike-stat-card { min-height: 118px; padding: 16px 14px; border-radius: 19px; }
       .youbike-stat-card p { margin-bottom: 17px; }
       .youbike-stat-card strong { font-size: clamp(1.65rem, 9vw, 2.35rem); }
-      .youbike-stat-card > span { display: block; margin: 7px 0 0; }
+      .youbike-stat-unit { display: block; margin: 7px 0 0; }
       .youbike-ranking-card { margin-top: 9px; padding: 18px 14px; border-radius: 19px; }
       .youbike-ranking-head { align-items: flex-start; flex-direction: column; gap: 9px; }
       .youbike-ranking-list li { grid-template-columns: 22px 54px minmax(60px, 1fr) 48px; gap: 7px; }
+      .youbike-zero-backdrop { padding: 6px; }
+      .youbike-zero-panel { width: calc(100vw - 12px); height: calc(100dvh - 12px); margin: 0; border-radius: 18px; }
+      .youbike-zero-panel-head { padding: 16px 12px 13px; }
+      .youbike-zero-panel-head h2 { font-size: 1.05rem; }
+      .youbike-zero-panel-tools { padding: 12px; }
+      .youbike-zero-district-list { padding: 7px 8px 12px; }
+      .youbike-zero-district-list li { grid-template-columns: 24px 54px minmax(54px, 1fr) 44px; gap: 7px; padding: 12px 9px; }
     }
