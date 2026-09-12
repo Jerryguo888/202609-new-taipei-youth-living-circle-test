@@ -42,7 +42,10 @@ async function request(path, options = {}) {
     try {
       payload = JSON.parse(text);
     } catch (error) {
-      payload = { error: text.slice(0, 300) };
+      /* 非 JSON 幾乎都代表請求沒走到後端，被中間層攔下了。
+         不要把 HTML 原文當成錯誤訊息倒到畫面上 —— 那會蓋掉唯一有用的線索
+         （狀態碼），使用者只會看到一坨 <!DOCTYPE html>。 */
+      payload = { error: describeNonJson(response.status, text) };
     }
   }
 
@@ -53,6 +56,24 @@ async function request(path, options = {}) {
     throw failure;
   }
   return payload;
+}
+
+/* 後端所有錯誤都回 JSON，所以收到 HTML 一定是 nginx、Cloudflare 或其他
+   反向代理／WAF 回的。把狀態碼講清楚並指出該去哪裡查，比貼一段 HTML 有用。 */
+function describeNonJson(status, text) {
+  const looksLikeHtml = /^\s*<(!doctype|html)/i.test(text);
+  const hints = {
+    413: "檔案太大，被反向代理擋下（不是後端的 20 MB 上限）。請檢查 nginx 的 client_max_body_size，以及 Cloudflare／負載平衡器的上傳大小限制。",
+    502: "後端沒有回應。請確認 chat 容器正在執行。",
+    503: "後端暫時無法服務。",
+    504: "後端逾時。上傳大檔時可能是中間層的超時設定太短。",
+  };
+  const hint =
+    hints[status] ||
+    (looksLikeHtml
+      ? "請求被中間層攔截，沒有到達後端。若網域經過 Cloudflare 或其他 WAF，請檢查那一層的規則與上傳限制。"
+      : "伺服器回了非預期的內容。");
+  return `請求失敗（HTTP ${status}）：${hint}`;
 }
 
 export const adminApi = {
