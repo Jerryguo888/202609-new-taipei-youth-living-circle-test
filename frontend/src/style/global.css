@@ -1546,16 +1546,26 @@
     .chat-launcher:hover { transform: translateY(-3px); box-shadow: 0 22px 54px rgba(16,59,40,.42); }
     .chat-launcher:focus-visible { outline: 4px solid rgba(244,191,34,.55); outline-offset: 3px; }
 
-    .chat-panel {
+    .chat-shell {
       position: fixed;
       top: 10px;
       right: 10px;
       bottom: 10px;
       z-index: 4100;
+      display: flex;
+      width: min(410px, calc(100vw - 20px));
+      min-width: 0;
+    }
+
+    .chat-panel {
+      position: relative;
+      z-index: 1;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
-      width: min(410px, calc(100vw - 20px));
-      height: auto;
+      width: 410px;
+      min-width: 0;
+      height: 100%;
+      flex: 0 0 min(410px, 100%);
       overflow: hidden;
       border: 1px solid rgba(255,255,255,.72);
       border-radius: 28px;
@@ -1580,6 +1590,36 @@
     .chat-title-group { min-width: 0; }
     .chat-header strong { display: block; font-size: 1.06rem; letter-spacing: -.02em; }
 
+    .chart-collapse-button {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(255,255,255,.1);
+      color: white;
+      font-size: .78rem;
+      font-weight: 800;
+    }
+
+    .chart-collapse-button svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .chart-collapse-button:hover { background: rgba(255,255,255,.2); }
+
+    .chart-collapse-button:focus-visible {
+      outline: 3px solid rgba(244,191,34,.62);
+      outline-offset: 2px;
+    }
+
     .chat-close {
       display: grid;
       width: 38px;
@@ -1598,6 +1638,85 @@
 
     .chat-close:hover { background: rgba(255,255,255,.18); }
     .chat-close:focus-visible { outline: 3px solid rgba(244,191,34,.62); outline-offset: 3px; }
+
+    .chat-chart-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 4300;
+      display: grid;
+      padding: 16px;
+      place-items: center;
+      background: rgba(5,28,18,.58);
+      backdrop-filter: blur(4px);
+    }
+
+    .chat-chart-modal {
+      display: grid;
+      width: min(1040px, calc(100vw - 32px));
+      height: min(820px, calc(100dvh - 32px));
+      min-width: 0;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.72);
+      border-radius: 26px;
+      outline: 0;
+      background: #f3f6f4;
+      color: var(--ink);
+      box-shadow: 0 28px 90px rgba(2,18,11,.42);
+    }
+
+    .chat-chart-modal-header {
+      display: flex;
+      min-height: 64px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 10px 8px 24px;
+      background: #123f2b;
+      color: white;
+    }
+
+    .chat-chart-modal-header strong { font-size: 1.12rem; }
+
+    .chart-collapse-button {
+      padding: 0 12px 0 9px;
+      border-radius: 999px;
+    }
+
+    .chat-chart-modal-body {
+      display: grid;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 28px;
+      align-items: center;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(28,95,56,.3) transparent;
+    }
+
+    .chat-chart-modal-body .ai-chart-wrap { width: 100%; margin-top: 0; }
+
+    .chat-chart-modal .ai-chart {
+      padding: 28px 30px 26px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.94);
+      box-shadow: 0 12px 34px rgba(31,65,59,.09);
+    }
+
+    .chat-chart-modal .ai-chart-title {
+      margin-bottom: 20px;
+      font-size: 1.25rem;
+    }
+
+    .chat-chart-modal .ai-chart-row {
+      grid-template-columns: minmax(110px, 180px) minmax(180px, 1fr) auto;
+      gap: 18px;
+      margin-bottom: 15px;
+      font-size: 1.06rem;
+    }
+
+    .chat-chart-modal .ai-chart-track { height: 22px; border-radius: 11px; }
+    .chat-chart-modal .ai-chart-note { margin-top: 18px; font-size: .94rem; }
+    .chat-chart-modal .ai-table { font-size: 1rem; }
 
     .chat-workspace { min-height: 0; overflow: hidden; }
 
@@ -1772,6 +1891,47 @@
        模型只能控制長條的 width 百分比，顏色與排版一律由這裡決定，
        所以圖表外觀不會因為模型亂寫而跑掉。 */
     .ai-chart-wrap { margin-top: 13px; }
+
+    .ai-chart-preview { margin-top: 13px; }
+    .ai-chart-preview .ai-chart-wrap { margin-top: 0; }
+
+    .ai-chart-expand-button {
+      display: inline-flex;
+      width: 100%;
+      min-height: 44px;
+      margin-top: 8px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid rgba(24,87,47,.2);
+      border-radius: 12px;
+      background: rgba(234,244,238,.88);
+      color: #175a35;
+      font-size: .82rem;
+      font-weight: 850;
+      transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+
+    .ai-chart-expand-button svg {
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .ai-chart-expand-button:hover {
+      border-color: rgba(24,87,47,.38);
+      background: #deeee4;
+    }
+
+    .ai-chart-expand-button:focus-visible {
+      outline: 3px solid rgba(244,191,34,.55);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 5px rgba(24,87,47,.1);
+    }
 
     .ai-chart {
       padding: 14px 15px 12px;
@@ -2028,13 +2188,52 @@
     .chat-drawer-enter-from,
     .chat-drawer-leave-to { opacity: 0; transform: translateX(18px) scale(.985); }
 
+    .chart-modal-enter-active,
+    .chart-modal-leave-active { transition: opacity .2s ease; }
+    .chart-modal-enter-active .chat-chart-modal,
+    .chart-modal-leave-active .chat-chart-modal { transition: transform .24s ease; }
+    .chart-modal-enter-from,
+    .chart-modal-leave-to { opacity: 0; }
+    .chart-modal-enter-from .chat-chart-modal,
+    .chart-modal-leave-to .chat-chart-modal { transform: translateY(12px) scale(.98); }
+
     @keyframes chat-typing-bounce {
       0%, 60%, 100% { transform: translateY(0); opacity: .4; }
       30% { transform: translateY(-7px); opacity: 1; }
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .chart-modal-enter-active,
+      .chart-modal-leave-active,
+      .chart-modal-enter-active .chat-chart-modal,
+      .chart-modal-leave-active .chat-chart-modal { transition: none; }
       .typing-dots i { animation: none; opacity: .72; }
+    }
+
+    @media (max-width: 760px) {
+      .chat-chart-modal-backdrop { padding: 8px; }
+
+      .chat-chart-modal {
+        width: 100%;
+        height: 100%;
+        max-height: none;
+        border-radius: 22px;
+      }
+
+      .chat-chart-modal-header { min-height: 58px; padding-left: 18px; }
+      .chat-chart-modal-body { padding: 14px; }
+
+      .chat-chart-modal .ai-chart {
+        padding: 18px 16px 16px;
+        border-radius: 16px;
+      }
+
+      .chat-chart-modal .ai-chart-row {
+        grid-template-columns: minmax(68px, 92px) minmax(90px, 1fr) auto;
+        gap: 9px;
+        margin-bottom: 11px;
+        font-size: .9rem;
+      }
     }
 
     /* [保留原導覽選單使用的淡入動畫。] */
@@ -2209,7 +2408,8 @@
       .chat-launcher-wrap { right: 14px; bottom: 16px; gap: 8px; }
       .chat-launcher-hint { margin-right: 2px; padding: 8px 11px; font-size: .76rem; }
       .chat-launcher { width: 60px; height: 60px; }
-      .chat-panel { inset: 6px; width: auto; border-radius: 24px; }
+      .chat-shell { inset: 6px; width: auto; }
+      .chat-panel { width: 100%; border-radius: 24px; }
       .chat-header { min-height: 54px; padding: 7px 8px 7px 15px; }
       .chat-header strong { font-size: 1rem; }
       .chat-close { width: 36px; height: 36px; }
