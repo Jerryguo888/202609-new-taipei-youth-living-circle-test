@@ -54,7 +54,7 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
               <img class="chat-avatar" :class="{ 'is-user': message.role === 'user' }"
                    :src="message.role === 'user' ? userAvatar : aiAvatar" alt="">
               <div class="chat-message-content">
-                <small class="chat-message-name">{{ message.role === "user" ? "Jerry" : "生活圈 AI 助理" }}</small>
+                <small class="chat-message-name">{{ message.role === "user" ? "USER" : "生活圈 AI 助理" }}</small>
                 <div class="message" :class="{ user: message.role === 'user' }">
                   <p>{{ message.text }}</p>
                 </div>
