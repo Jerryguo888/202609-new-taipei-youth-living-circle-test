@@ -27,6 +27,7 @@ import {
 } from "../lib/mapLibreMap.js";
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
 import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
+import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
 
 const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—" };
 
@@ -62,6 +63,12 @@ export const appState = reactive({
   childcareGapLoaded: false,
   childcareGapLoading: false,
   childcareGapStatus: "托育缺口資料待載入",
+  /* [本次新增：死因統計使用獨立狀態，不影響既有托育缺口資料與錯誤處理] */
+  mortalityLoaded: false,
+  mortalityLoading: false,
+  mortalityStatus: "死因統計資料待載入",
+  mortalityYear: "",
+  mortalityRows: [],
   stopMode: "bus",
   stationGroups: [],
   activeDistrict: "板橋區",
@@ -140,6 +147,25 @@ export const appState = reactive({
       };
     }, this);
   },
+  /* [本次新增：完整排行保留在 mortalityRows，首頁卡片只取排序後前五名] */
+  get mortalityTop5Rows() {
+    return this.mortalityRows.slice(0, 5);
+  },
+  /* [本次新增：由29區資料動態加總全新北市的同齡自殺死亡占比，供放大圖表標題顯示] */
+  get mortalityCitySummary() {
+    const totals = this.mortalityRows.reduce(function (summary, row) {
+      summary.suicideDeaths += row.suicideDeaths;
+      summary.totalDeaths += row.totalDeaths;
+      return summary;
+    }, { suicideDeaths: 0, totalDeaths: 0 });
+    return {
+      suicideDeaths: totals.suicideDeaths,
+      totalDeaths: totals.totalDeaths,
+      ratio: totals.totalDeaths > 0
+        ? Math.round((totals.suicideDeaths / totals.totalDeaths) * 1000) / 10
+        : null,
+    };
+  },
 
   /* ===== methods（原本 Vue methods，行為與呼叫方式不變，只是掛在這個共用單例上） ===== */
   go(view) {
@@ -210,6 +236,24 @@ export const appState = reactive({
       this.childcareGapStatus = "資料載入失敗。" + dataLoadHint();
     } finally {
       this.childcareGapLoading = false;
+    }
+  },
+  /* [本次新增：死因統計獨立載入；失敗時不會清空或遮蔽既有托育圖表] */
+  async loadMortalityData() {
+    if (this.mortalityLoaded || this.mortalityLoading) return;
+    this.mortalityLoading = true;
+    this.mortalityStatus = "讀取20~29歲死因統計…";
+    try {
+      const result = await loadYouthSuicideShareRows();
+      this.mortalityYear = result.year;
+      this.mortalityRows = result.rows;
+      this.mortalityLoaded = true;
+      this.mortalityStatus = "";
+    } catch (error) {
+      console.error(error);
+      this.mortalityStatus = "資料載入失敗。" + dataLoadHint();
+    } finally {
+      this.mortalityLoading = false;
     }
   },
   chooseStop(nodeId, moveMap) {
@@ -307,5 +351,6 @@ export async function ensureViewReady(view) {
     setIntegratedTransitVisibility(appState.showTransitStops);
   } else if (view === "resources") {
     await appState.loadResourceGapData();
+    await appState.loadMortalityData();
   }
 }
