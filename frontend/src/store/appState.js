@@ -416,8 +416,8 @@ export const appState = reactive({
         streamingMessage = { role: "assistant", text: "", sources: [], charts: [] };
         store.chatMessages.push(streamingMessage);
       }
-      /* 沒有圍籬符號時走快速路徑，不必每個 token 都重跑一次消毒；
-         純文字回覆因此完全不碰 DOMPurify。 */
+      /* 沒有圍籬符號時走快速路徑，不必每個 token 都重跑圖表消毒；
+         assistant 文字會在 ChatWidget 渲染時由 assistantMarkdown.js 統一消毒。 */
       if (full.indexOf("```") === -1) {
         streamingMessage.text = full;
       } else {
