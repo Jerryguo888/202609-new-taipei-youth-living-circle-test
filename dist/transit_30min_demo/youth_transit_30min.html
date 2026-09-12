@@ -26,7 +26,7 @@
        本檔是獨立 Vue SPA，沒有修改原始 3d_map 任何檔案。 */
     :root {
       color-scheme: light;
-      --paper: #f7f8f5;
+      --paper: #ffffff;
       --mist: #dce7eb;
       --mist-deep: #b9cbd3;
       --ink: #17372f;
@@ -56,12 +56,13 @@
     body {
       min-width: 320px;
       margin: 0;
+      padding: 0;
       overflow-x: hidden;
       color: var(--ink);
-      background:
+      /* background:
         radial-gradient(circle at 2% 20%, rgba(135, 203, 183, .15), transparent 24%),
         radial-gradient(circle at 95% 8%, rgba(185, 203, 211, .32), transparent 22%),
-        var(--paper);
+        var(--paper); */
       font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
     }
@@ -72,104 +73,60 @@
 
     .site-shell { min-height: 100vh; }
 
-    .site-header {
-      position: sticky;
-      top: 0;
-      z-index: 1500;
-      display: grid;
-      grid-template-columns: minmax(215px, .85fr) minmax(530px, 1.8fr) minmax(150px, .65fr);
-      align-items: center;
-      gap: 18px;
-      height: 82px;
-      padding: 0 clamp(18px, 3vw, 46px);
-      border-bottom: 1px solid rgba(23,55,47,.06);
-      background: rgba(247, 248, 245, .9);
-      backdrop-filter: blur(18px);
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 11px;
-      width: max-content;
-      color: var(--ink);
-      font-weight: 850;
-      letter-spacing: -.02em;
-    }
-
-    .brand-mark {
-      position: relative;
-      display: grid;
-      width: 42px;
-      height: 42px;
-      place-items: center;
-      overflow: hidden;
-      border-radius: 13px;
-      background: var(--forest);
-      color: white;
-      box-shadow: 0 8px 22px rgba(24, 87, 47, .2);
-    }
-
-    .brand-mark svg { display: block; width: 42px; height: 42px; }
-
-    .brand-name span {
-      display: block;
-      color: var(--ink-soft);
-      font-size: .68rem;
-      font-weight: 650;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-    }
-
-    .desktop-nav {
+    /* ===== [本次改版：移除常駐頂部選單，改成可收起的懸浮圓球選單] ===== */
+    .nav-orb-wrap {
+      position: fixed;
+      right: 48px;
+      top: 24px;
+      z-index: 2100;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      padding: 6px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.7);
-      box-shadow: inset 0 0 0 1px rgba(23,55,47,.06);
-      overflow-x: auto;
-      scrollbar-width: none;
+      flex-direction: column-reverse;
+      align-items: flex-start;
+      gap: 10px;
     }
 
-    .desktop-nav::-webkit-scrollbar { display: none; }
-
-    .nav-button {
-      min-width: 80px;
-      padding: 10px 12px;
-      border-radius: 999px;
-      background: transparent;
-      color: #657a75;
-      font-size: .84rem;
-      font-weight: 700;
-      transition: background .2s, color .2s, transform .2s;
-    }
-
-    .nav-button:hover { color: var(--forest); transform: translateY(-1px); }
-    .nav-button.active {
-      background: var(--white);
-      color: var(--forest);
-      box-shadow: 0 7px 22px rgba(31, 65, 59, .1);
-    }
-
-    .header-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 9px;
-    }
-
-    .round-button {
+    .nav-orb {
       display: grid;
-      width: 40px;
-      height: 40px;
+      width: 58px;
+      height: 58px;
+      flex: 0 0 auto;
       place-items: center;
+      border: 4px solid rgba(255,255,255,.8);
       border-radius: 50%;
       background: var(--forest);
       color: white;
-      box-shadow: 0 7px 20px rgba(24, 87, 47, .18);
+      font-size: 1.4rem;
+      box-shadow: 0 16px 40px rgba(24,87,47,.28);
+      transition: transform .2s;
     }
+
+    .nav-orb.open { transform: rotate(90deg); }
+
+    .nav-orb-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.96);
+      box-shadow: 0 20px 50px rgba(23,55,47,.22);
+      animation: chat-in .18s ease-out;
+    }
+
+    .nav-orb-item {
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink);
+      font-size: .86rem;
+      font-weight: 700;
+      text-align: left;
+      white-space: nowrap;
+      transition: background .2s, color .2s;
+    }
+
+    .nav-orb-item:hover { background: rgba(24,87,47,.08); }
+    .nav-orb-item.active { background: var(--forest); color: white; }
 
     .page-container {
       width: min(1600px, calc(100% - 28px));
@@ -177,53 +134,56 @@
       padding: 0 0 42px;
     }
 
-    .view { min-height: calc(100vh - 82px); }
+    .view { min-height: 100vh; }
 
-    /* ===== [改版新增：首頁 Hero 開始] ===== */
-    .hero {
+    .section-kicker {
+      margin: 0 0 12px;
+      color: var(--forest-2);
+      font-size: .78rem;
+      font-weight: 850;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    /* ===== [本次改版：首頁只留一個進入地圖的按鈕，背景圖佔滿整個視窗] =====
+       首頁原本包在寬度受限、置中的 .page-container 裡，子層設 width:100vw 只會
+       從 page-container 的起始位置往右延伸，導致左側露出一截空白、右側被裁掉。
+       改成 position:fixed + inset:0，直接跳出 page-container 的寬度限制。 */
+    .home-view {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+    }
+
+    .home-launch {
       position: relative;
-      min-height: calc(100vh - 104px);
-      overflow: hidden;
-      border-radius: var(--radius-xl);
-      background: #b9cbd3;
-      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      background: url("./assets/new-taipei-living-circle-hero.png") center / cover no-repeat;
+      color: #ffffff;
       isolation: isolate;
     }
 
-    .hero-image {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: center;
-      filter: saturate(.9) contrast(.98);
-      transform: scale(1.01);
-    }
-
-    .hero::before {
+    .home-launch::before {
       position: absolute;
       inset: 0;
       z-index: 1;
+      content: "";
       background:
         linear-gradient(90deg, rgba(24,55,47,.64) 0%, rgba(24,55,47,.24) 35%, rgba(24,55,47,0) 68%),
         linear-gradient(0deg, rgba(24,55,47,.22), transparent 45%);
-      content: "";
     }
 
-    .hero-copy {
+    .home-copy {
       position: relative;
       z-index: 2;
-      display: flex;
-      min-height: calc(100vh - 104px);
       max-width: 650px;
-      flex-direction: column;
-      justify-content: center;
       padding: clamp(34px, 6vw, 90px);
-      color: white;
     }
 
-    .hero-kicker {
+    .home-kicker {
       display: inline-flex;
       align-items: center;
       gap: 9px;
@@ -239,7 +199,7 @@
       backdrop-filter: blur(12px);
     }
 
-    .hero-kicker i {
+    .home-kicker i {
       width: 8px;
       height: 8px;
       border-radius: 50%;
@@ -247,7 +207,7 @@
       box-shadow: 0 0 0 5px rgba(184,240,208,.16);
     }
 
-    .hero h1 {
+    .home-title {
       max-width: 620px;
       margin: 0;
       font-size: clamp(3.4rem, 6.7vw, 7.8rem);
@@ -257,7 +217,7 @@
       text-wrap: balance;
     }
 
-    .hero h1 span {
+    .home-title span {
       display: block;
       margin-top: .12em;
       font-family: Georgia, "Noto Serif TC", serif;
@@ -265,9 +225,10 @@
       font-style: italic;
       font-weight: 400;
       letter-spacing: -.045em;
+      margin-top: 25px;
     }
 
-    .hero-description {
+    .home-description {
       max-width: 470px;
       margin: 30px 0 0;
       padding-left: 18px;
@@ -277,14 +238,12 @@
       line-height: 1.75;
     }
 
-    .hero-actions {
+    .home-actions {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
       margin-top: 28px;
     }
 
-    .hero-primary, .hero-secondary {
+    .home-launch-button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -292,153 +251,17 @@
       min-height: 48px;
       padding: 0 20px;
       border-radius: 999px;
-      font-weight: 780;
-    }
-
-    .hero-primary {
       background: white;
       color: var(--forest);
+      font-weight: 780;
       box-shadow: 0 12px 30px rgba(19,50,42,.18);
+      transition: transform .2s, box-shadow .2s;
     }
 
-    .hero-secondary {
-      border: 1px solid rgba(255,255,255,.36);
-      background: rgba(255,255,255,.1);
-      color: white;
-      backdrop-filter: blur(10px);
+    .home-launch-button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 36px rgba(19,50,42,.24);
     }
-
-    .hero-facts {
-      position: absolute;
-      right: clamp(20px, 3vw, 46px);
-      bottom: clamp(20px, 3vw, 42px);
-      z-index: 3;
-      display: grid;
-      grid-template-columns: repeat(2, minmax(118px, 1fr));
-      width: min(340px, 38vw);
-      overflow: hidden;
-      border: 1px solid rgba(255,255,255,.38);
-      border-radius: 22px;
-      background: rgba(248,251,250,.78);
-      color: var(--ink);
-      backdrop-filter: blur(18px);
-      box-shadow: 0 20px 50px rgba(31,65,59,.13);
-    }
-
-    .hero-fact {
-      padding: 18px;
-      border-right: 1px solid rgba(23,55,47,.09);
-      border-bottom: 1px solid rgba(23,55,47,.09);
-    }
-
-    .hero-fact:nth-child(even) { border-right: 0; }
-    .hero-fact:nth-child(n+3) { border-bottom: 0; }
-    .hero-fact strong { display: block; font-size: 1.6rem; letter-spacing: -.04em; }
-    .hero-fact span { color: var(--ink-soft); font-size: .76rem; }
-
-    .home-intro {
-      display: grid;
-      grid-template-columns: .8fr 1.2fr;
-      gap: 60px;
-      padding: 100px clamp(12px, 4vw, 60px) 64px;
-    }
-
-    .section-kicker {
-      margin: 0 0 12px;
-      color: var(--forest-2);
-      font-size: .78rem;
-      font-weight: 850;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-    }
-
-    .display-title {
-      max-width: 800px;
-      margin: 0;
-      color: var(--ink);
-      font-size: clamp(2.4rem, 4.8vw, 5.3rem);
-      font-weight: 520;
-      letter-spacing: -.06em;
-      line-height: 1.03;
-    }
-
-    .intro-copy {
-      max-width: 700px;
-      margin: 0;
-      color: var(--ink-soft);
-      font-size: 1.06rem;
-      line-height: 1.9;
-    }
-
-    .feature-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 14px;
-      padding: 0 clamp(12px, 4vw, 60px) 90px;
-    }
-
-    .feature-card {
-      position: relative;
-      min-height: 285px;
-      overflow: hidden;
-      padding: 24px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: white;
-      color: var(--ink);
-      text-align: left;
-      transition: transform .25s, box-shadow .25s;
-    }
-
-    .feature-card:hover {
-      transform: translateY(-6px);
-      box-shadow: var(--shadow);
-    }
-
-    .feature-card:nth-child(2) { background: #dbe9ec; }
-    .feature-card:nth-child(3) { background: var(--forest); color: white; }
-    .feature-card:nth-child(4) { background: #edf0df; }
-
-    .feature-index {
-      display: inline-grid;
-      width: 34px;
-      height: 34px;
-      place-items: center;
-      border: 1px solid currentColor;
-      border-radius: 50%;
-      opacity: .72;
-      font-size: .72rem;
-    }
-
-    .feature-card h3 {
-      margin: 58px 0 12px;
-      font-size: 1.4rem;
-      letter-spacing: -.03em;
-    }
-
-    .feature-card p {
-      margin: 0;
-      color: inherit;
-      font-size: .88rem;
-      line-height: 1.75;
-      opacity: .72;
-    }
-
-    .feature-arrow {
-      position: absolute;
-      right: 20px;
-      bottom: 20px;
-      display: grid;
-      width: 38px;
-      height: 38px;
-      place-items: center;
-      border-radius: 50%;
-      background: rgba(23,55,47,.08);
-      font-size: 1.15rem;
-    }
-
-    .feature-card:nth-child(3) .feature-arrow { background: rgba(255,255,255,.13); }
-    /* ===== [改版新增：首頁 Hero 結束] ===== */
 
     /* ===== [改版新增：功能頁共用樣式開始] ===== */
     .module {
@@ -450,10 +273,10 @@
       align-items: flex-end;
       justify-content: space-between;
       gap: 32px;
-      min-height: 250px;
-      padding: clamp(34px, 5vw, 72px);
+      /* min-height: 250px; */
+      /* padding: clamp(34px, 5vw, 72px); */
       border-radius: var(--radius-xl);
-      background: var(--mist);
+      /* background: var(--mist); */
     }
 
     .module-hero.green {
@@ -463,13 +286,15 @@
         var(--forest);
     }
 
-    .module-hero h1 {
-      max-width: 850px;
+    .module-hero div {
+      /* max-width: 850px; */
+      width: 100%;
       margin: 0;
-      font-size: clamp(2.5rem, 5vw, 5rem);
+      font-size: 30px;
       font-weight: 540;
-      letter-spacing: -.06em;
+      /* letter-spacing: -.06em; */
       line-height: 1;
+      text-align: center;
     }
 
     .module-hero p {
@@ -484,49 +309,7 @@
       padding: 22px 0 80px;
     }
 
-    /* ===== [2026-09-11 新增：3D 人口＋30 分鐘交通的一頁式入口] ===== */
-    .combined-hero {
-      color: #f4f6f5;
-      background:
-        linear-gradient(120deg, rgba(255,255,255,.04), transparent 52%),
-        #171b1d;
-    }
-
-    .combined-view { min-height: 0; }
-
-    .combined-steps {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 18px;
-    }
-
-    .combined-step {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 38px;
-      padding: 0 13px;
-      border: 1px solid rgba(255,255,255,.16);
-      border-radius: 999px;
-      background: rgba(255,255,255,.08);
-      color: #f4f6f5;
-      font-size: .76rem;
-      font-weight: 760;
-    }
-
-    .combined-step span {
-      display: grid;
-      width: 22px;
-      height: 22px;
-      place-items: center;
-      border-radius: 50%;
-      background: #dce2df;
-      color: #202526;
-      font-size: .66rem;
-    }
-
-    .combined-part { scroll-margin-top: 94px; }
+    .combined-part { scroll-margin-top: 24px; }
 
     .toolbar {
       display: flex;
@@ -1098,13 +881,32 @@
 
     .map-reset-button:hover { background: rgba(255,255,255,.16); }
 
+    /* ===== [本次改版：整合地圖佔滿整個視窗，不留標題與外框] =====
+       這裡同時有 .module 這個 class，會帶 padding-top:12px，
+       在 fixed 版面下變成頂端一直有一條空白，所以要在這裡蓋掉它。 */
+    .is-fullscreen-map {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      min-height: 100vh;
+      padding-top: 0;
+    }
+
+    .is-fullscreen-map .module-body { padding: 0; height: 100%; }
+    .is-fullscreen-map .legacy-map-shell { height: 100%; border: 0; border-radius: 0; box-shadow: none; }
+    .is-fullscreen-map .legacy-map-toolbar { display: none; }
+    .is-fullscreen-map .population-3d-stage.with-transit { height: 100%; min-height: 100vh; }
+
+    /* [本次改版：交通操作面板固定在地圖左側中間偏上的位置；不用 translateY(-50%) 置中，
+       因為那樣收合時上下兩邊會一起往中間縮，看起來像往下收到正中間。改成固定 top，
+       收合時只有下緣往上收，視覺上是「往上收攏」回到固定的頂端位置] */
     .integrated-transit-panel {
       position: absolute;
       z-index: 6;
-      top: 16px;
-      right: 16px;
+      left: 16px;
+      top: 21%;
       width: min(350px, calc(100% - 32px));
-      max-height: calc(100% - 112px);
+      max-height: calc(100% - 220px);
       overflow: auto;
       border: 1px solid rgba(255,255,255,.14);
       border-radius: 16px;
@@ -1187,6 +989,7 @@
     .integrated-metrics strong { display: block; color: #fff; font-size: .77rem; }
     .integrated-metrics span { display: block; margin-top: 2px; color: #8f9c98; font-size: .57rem; }
     .integrated-model-note { margin: 10px 1px 0; color: #99a6a2; font-size: .64rem; line-height: 1.55; }
+    .integrated-transit-body > .map-reset-button { width: 100%; margin-top: 12px; }
 
     #population-3d-map { position: absolute; inset: 0; }
 
@@ -1210,7 +1013,9 @@
     .population-3d-legend .legend-checkbox { width: 16px; height: 16px; accent-color: var(--mint); }
     .population-3d-legend .swatch { width: 13px; height: 13px; border-radius: 4px; }
 
-    .population-3d-year-panel { right: 16px; bottom: 16px; width: min(390px, calc(100% - 32px)); padding: 13px 16px; }
+    /* [本次改版：交通面板搬到左側置中後，右上角空出來，年份面板改放這裡，
+       右下角才能真的空給縮放鍵跟 AI 按鈕用] */
+    .population-3d-year-panel { bottom: 16px; left: 16px; width: min(390px, calc(100% - 32px)); padding: 13px 16px; }
     .population-3d-year-panel > span { color: #9fb0aa; font-size: .66rem; letter-spacing: .08em; }
     .population-3d-year-row { display: flex; align-items: center; gap: 14px; margin-top: 7px; }
     .population-3d-year-row input { flex: 1; accent-color: #87cbb7; }
@@ -1357,7 +1162,7 @@
     .chat-launcher {
       position: fixed;
       right: 24px;
-      bottom: 24px;
+      bottom: 48px;
       z-index: 2100;
       display: grid;
       width: 58px;
@@ -1371,6 +1176,7 @@
       font-size: .78rem;
       font-weight: 900;
       letter-spacing: .04em;
+      transition: right .2s, bottom .2s;
     }
 
     .chat-panel {
@@ -1493,37 +1299,16 @@
     }
 
     @media (max-width: 1120px) {
-      .site-header { grid-template-columns: auto 1fr auto; }
-      .nav-button { min-width: auto; padding: 10px 11px; font-size: .76rem; }
-      .feature-grid { grid-template-columns: repeat(2, 1fr); }
       .dashboard-grid, .budget-layout { grid-template-columns: 1fr; }
-      .hero-facts { width: 300px; }
     }
 
     @media (max-width: 820px) {
-      .site-header {
-        height: auto;
-        min-height: 72px;
-        grid-template-columns: 1fr auto;
-        padding: 10px 14px;
-      }
-      .desktop-nav {
-        grid-column: 1 / -1;
-        justify-content: flex-start;
-        overflow-x: auto;
-        border-radius: 16px;
-      }
-      .nav-button { flex: 0 0 auto; }
       .page-container { width: min(100% - 18px, 1600px); }
-      .hero, .hero-copy { min-height: 720px; }
-      .hero-copy { justify-content: flex-start; padding-top: 92px; }
-      .hero h1 { font-size: clamp(3.2rem, 16vw, 5rem); }
-      .hero::before { background: linear-gradient(180deg, rgba(24,55,47,.62), rgba(24,55,47,.05) 65%, rgba(24,55,47,.35)); }
-      .hero-image { object-position: 63% center; }
-      .hero-facts { right: 16px; bottom: 16px; left: 16px; width: auto; }
-      .hero-fact { padding: 12px; }
-      .home-intro { grid-template-columns: 1fr; gap: 20px; padding-top: 72px; }
-      .feature-grid, .gap-grid { grid-template-columns: 1fr; }
+      .nav-orb-wrap { left: 14px; bottom: 14px; }
+      .home-launch { align-items: flex-start; }
+      .home-copy { padding-top: 92px; }
+      .home-title { font-size: clamp(3.2rem, 16vw, 5rem); }
+      .gap-grid { grid-template-columns: 1fr; }
       .module-hero { align-items: flex-start; flex-direction: column; }
       .transit-layout { grid-template-columns: 1fr; }
       .transit-sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -1534,11 +1319,9 @@
       .legacy-map-toolbar { align-items: flex-start; flex-direction: column; }
       .legacy-map-actions { width: 100%; justify-content: space-between; }
       .population-3d-legend { top: 10px; left: 10px; }
-      .integrated-transit-panel { top: 128px; right: 10px; width: calc(100% - 20px); max-height: calc(100% - 210px); }
-      .population-3d-year-panel { right: 10px; bottom: 10px; width: calc(100% - 20px); }
-      /* [2026-09-11 RWD 修正：手機已有頁首 AI 入口，隱藏重複浮鈕避免遮住地圖操作] */
+      .integrated-transit-panel { left: 10px; width: calc(100% - 20px); max-height: calc(100% - 210px); }
+      .population-3d-year-panel { left: 10px; bottom: 10px; width: calc(100% - 20px); }
       .chat-panel { right: 10px; bottom: 10px; left: 10px; width: auto; }
-      .chat-launcher { display: none; }
     }
   </style>
 </head>
@@ -1546,106 +1329,42 @@
 <body>
   <!-- ===== [改版新增：Vue 3 單頁應用開始] ===== -->
   <div id="app" v-cloak class="site-shell">
-    <header class="site-header">
-      <button class="brand" @click="go('home')" aria-label="回首頁">
-        <!-- [本次新增：依使用者提供圖樣製作的向量 Logo，不另載外部圖片] -->
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 48 48" role="img">
-            <rect width="48" height="48" rx="13" fill="#0e3a35"/>
-            <circle cx="33" cy="37" r="20" fill="#287b50"/>
-            <path d="M12 43a21 21 0 0 1 34-20" fill="none" stroke="#8bd0b4" stroke-width="6"/>
-            <path d="M19 31v-8h3v8m3 0V19h3v12m3 0v-6h3v6" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/>
-            <path d="M16 20l2-2 2 2-2 2zM13 25h4M15 23v4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-        </span>
-        <span class="brand-name">青年生活圈<span>New Taipei Youth Atlas</span></span>
-      </button>
-
-      <nav class="desktop-nav" aria-label="主要功能">
+    <!-- ===== [本次改版：移除常駐頂部選單，改成可收起的懸浮圓球選單] ===== -->
+    <div class="nav-orb-wrap" v-show="activeView !== 'home'">
+      <div class="nav-orb-menu" v-if="navMenuOpen">
         <button v-for="item in navItems" :key="item.id"
-                class="nav-button" :class="{ active: activeView === item.id }"
-                @click="go(item.id)">{{ item.label }}</button>
-      </nav>
-
-      <div class="header-actions">
-        <button class="round-button" @click="chatOpen = true" aria-label="開啟 AI 助理">AI</button>
+                class="nav-orb-item" :class="{ active: activeView === item.id }"
+                @click="go(item.id); navMenuOpen = false">{{ item.label }}</button>
       </div>
-    </header>
+      <button class="nav-orb" :class="{ open: navMenuOpen }"
+              @click="navMenuOpen = !navMenuOpen"
+              :aria-expanded="navMenuOpen" aria-label="開啟導覽選單">
+        <span v-if="!navMenuOpen">☰</span><span v-else>×</span>
+      </button>
+    </div>
 
     <main class="page-container">
-      <!-- ===== [改版新增：平台首頁] ===== -->
-      <section class="view" v-show="activeView === 'home'">
-        <div class="hero">
-          <img class="hero-image" src="assets/new-taipei-living-circle-hero.png"
-               alt="漂浮的新北生活圈城市，包含住宅、校園、托育、交通與公共服務">
-          <div class="hero-copy">
-            <div class="hero-kicker"><i></i>NEW TAIPEI · YOUTH FUTURES</div>
-            <h1>看見青年<span>讓城市先準備</span></h1>
-            <p class="hero-description">
+      <!-- ===== [本次改版：首頁只留一個進入地圖的按鈕] ===== -->
+      <section class="view home-view" v-show="activeView === 'home'">
+        <div class="home-launch">
+          <div class="home-copy">
+            <!-- <div class="home-kicker"><i></i>NEW TAIPEI · YOUTH FUTURES</div> -->
+            <h1 class="home-title">看見青年<span>讓城市先準備</span></h1>
+            <p class="home-description">
               預測青年未來 1～3 年往哪裡移動與成家，提前看見公共服務缺口，
               再把職涯服務放到 30 分鐘內真正到得了的位置。
             </p>
-            <div class="hero-actions">
-              <button class="hero-primary" @click="go('combined')">進入整合地圖 <span>→</span></button>
-              <button class="hero-secondary" @click="go('map3d')">查看 3D 人口地圖</button>
+            <div class="home-actions">
+              <button class="home-launch-button" @click="go('combined')">進入整合地圖 <span>→</span></button>
             </div>
           </div>
-          <div class="hero-facts" aria-label="平台範圍">
-            <div class="hero-fact"><strong>29</strong><span>行政區同步觀察</span></div>
-            <div class="hero-fact"><strong>1–3 年</strong><span>青年趨勢推估</span></div>
-            <div class="hero-fact"><strong>30 分</strong><span>服務可達生活圈</span></div>
-            <div class="hero-fact"><strong>4 種</strong><span>服務配置模式</span></div>
-          </div>
-        </div>
-
-        <div class="home-intro">
-          <div>
-            <p class="section-kicker">One Map, Better Decisions</p>
-            <h2 class="display-title">一張地圖，把分散資料變成下一步。</h2>
-          </div>
-          <p class="intro-copy">
-            平台把人口、住宅、托育、教育、就業服務與交通可達性放進同一個決策流程。
-            從「哪裡會成長」一路回答到「服務要放哪裡、需要多少預算」，讓各局處能看見同一個未來。
-          </p>
-        </div>
-
-        <div class="feature-grid">
-          <button v-for="(feature, index) in features" :key="feature.view"
-                  class="feature-card" @click="go(feature.view)">
-            <span class="feature-index">0{{ index + 1 }}</span>
-            <h3>{{ feature.title }}</h3>
-            <p>{{ feature.copy }}</p>
-            <span class="feature-arrow">↗</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- ===== [2026-09-11 新增：3D 人口與交通真正疊於同一張圖，原始分頁仍保留] ===== -->
-      <section class="view module combined-view" v-show="activeView === 'combined'">
-        <div class="module-hero combined-hero">
-          <div>
-            <p class="section-kicker" style="color:#cbd2cf">Population × Mobility</p>
-            <h1>人口與 30 分鐘交通整合地圖</h1>
-            <div class="combined-steps" aria-label="整合地圖閱讀順序">
-              <div class="combined-step"><span>01</span>看鮮豔人口柱</div>
-              <div class="combined-step"><span>02</span>選公車或捷運站</div>
-              <div class="combined-step"><span>03</span>同圖顯示 30 分鐘路網</div>
-            </div>
-          </div>
-          <p>人口柱、站點、捷運線與計算後的 30 分鐘交通路網，全部疊在同一張可旋轉的 3D 地圖。</p>
         </div>
       </section>
 
       <!-- ===== [組員原始 3D 分頁保留；整合頁僅額外顯示同一份內容] ===== -->
       <section id="combined-population" class="view module combined-part"
+               :class="{ 'is-fullscreen-map': activeView === 'combined' }"
                v-show="activeView === 'map3d' || activeView === 'combined'">
-        <div class="module-hero green">
-          <div>
-            <p class="section-kicker" style="color:#b8f0d0">Existing Team Work</p>
-            <h1>青年人口 3D 地圖</h1>
-          </div>
-          <p>整合組員原先製作的歷年 20～34 歲人口堆疊地圖；功能已移植到本頁，原始 HTML、程式與 CSV 均未改動。</p>
-        </div>
         <div class="module-body legacy-map-body">
           <div class="legacy-map-shell">
             <div class="legacy-map-toolbar">
@@ -1728,6 +1447,7 @@
                     <div><strong>{{ metrics.wait }}</strong><span>起始候車</span></div>
                   </div>
                   <p class="integrated-model-note">已納入平均候車、站間行駛、停靠、步行轉乘與轉乘候車；目前為規劃估算。</p>
+                  <button class="map-reset-button" @click="resetPopulationMapView">回到新北全區</button>
                 </div>
               </details>
             </div>
@@ -3430,6 +3150,9 @@
         return;
       }
 
+      /* [本次修正：交通站點圖層一律插在人口柱之前，柱狀圖與行政區文字才不會被站點蓋住] */
+      const beforeLayerId = population3dMap.getLayer("pop-bars-layer") ? "pop-bars-layer" : undefined;
+
       const base = integratedBaseCollections();
       population3dMap.addSource("integrated-bus-source", {
         type: "geojson",
@@ -3453,7 +3176,7 @@
           "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.2, 13, 5.5],
           "line-opacity": .88
         }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-result-lines",
         type: "line",
@@ -3463,7 +3186,7 @@
           "line-width": ["case", ["==", ["get", "mode"], "metro"], 5, 2.8],
           "line-opacity": .94
         }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-bus-clusters",
         type: "circle",
@@ -3476,7 +3199,7 @@
           "circle-stroke-width": 1.5,
           "circle-opacity": .9
         }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-bus-cluster-count",
         type: "symbol",
@@ -3484,7 +3207,7 @@
         filter: ["has", "point_count"],
         layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 10 },
         paint: { "text-color": "#ffffff" }
-      });
+      }, beforeLayerId);
       /* [2026-09-11 修正：群組點保留原尺寸，另外加大透明熱區避免旋轉地圖時點不到] */
       population3dMap.addLayer({
         id: "integrated-bus-cluster-hit",
@@ -3496,7 +3219,7 @@
           "circle-radius": ["step", ["get", "point_count"], 20, 30, 23, 100, 27],
           "circle-opacity": .01
         }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-bus-stops",
         type: "circle",
@@ -3509,7 +3232,7 @@
           "circle-stroke-width": 1.4,
           "circle-opacity": .94
         }
-      });
+      }, beforeLayerId);
       /* [2026-09-11 修正：灰色站點視覺維持 3.5～6px，但滑鼠／觸控可按範圍擴為 12～15px] */
       population3dMap.addLayer({
         id: "integrated-bus-stop-hit",
@@ -3521,7 +3244,7 @@
           "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 12, 14, 15],
           "circle-opacity": .01
         }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-result-points",
         type: "circle",
@@ -3533,7 +3256,7 @@
           "circle-stroke-width": 1.5,
           "circle-opacity": .98
         }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-metro-stations",
         type: "circle",
@@ -3545,13 +3268,13 @@
           "circle-stroke-width": 2,
           "circle-opacity": .98
         }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-origin-glow",
         type: "circle",
         source: "integrated-origin-source",
         paint: { "circle-color": "#ff574b", "circle-radius": 18, "circle-opacity": .22 }
-      });
+      }, beforeLayerId);
       population3dMap.addLayer({
         id: "integrated-origin",
         type: "circle",
@@ -3562,7 +3285,7 @@
           "circle-stroke-color": "#ffffff",
           "circle-stroke-width": 2.2
         }
-      });
+      }, beforeLayerId);
 
       integratedTransitReady = true;
       const mapElement = document.getElementById("population-3d-map");
@@ -3932,7 +3655,7 @@
           bearing: -10,
           antialias: true
         });
-        population3dMap.addControl(new maplibregl.NavigationControl({ visualizePitch: true }));
+        population3dMap.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
 
         function setYear(year) {
           currentYear = year;
@@ -4085,12 +3808,7 @@
             { id: "transit", label: "30 分鐘交通" },
             { id: "budget", label: "預算模擬" }
           ],
-          features: [
-            { view: "forecast", title: "青年與成家預測", copy: "辨識青年移入、住宅成長與成家需求同步升溫的生活圈。" },
-            { view: "resources", title: "公共資源缺口", copy: "把未來需求與既有托育、學校、停車容量放在同一張風險圖。" },
-            { view: "transit", title: "30 分鐘可達分析", copy: "從交通節點出發，找出職涯服務覆蓋範圍與目前服務死角。" },
-            { view: "budget", title: "選址與預算情境", copy: "比較固定據點、巡迴駐點與行動服務的覆蓋效益與年度成本。" }
-          ],
+          navMenuOpen: false,
           resourceType: "all",
           gapItems: [
             { area: "林口區", type: "childcare", name: "托育", gap: "缺口 420 席", label: "HIGH DEMAND", level: "risk", copy: "青年家庭與住宅供給同步增長，建議優先盤點公共托育量能。" },
