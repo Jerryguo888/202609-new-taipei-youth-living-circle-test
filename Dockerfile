@@ -46,7 +46,16 @@ COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 # not pick the snippet up as a standalone server config.
 COPY docker/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-RUN nginx -t
+
+# Fail the build on a bad config instead of at rollout time.
+#
+# `nginx -t` also creates the pid file declared in nginx.conf (/tmp/nginx.pid in
+# this image). Running as root would leave it owned by root:root inside the
+# layer, and the non-root runtime user could then never write it — nginx dies on
+# startup with `open() "/tmp/nginx.pid" failed (13: Permission denied)`. Delete
+# it so the running container creates it fresh as UID 101.
+RUN nginx -t && rm -f /tmp/nginx.pid
+
 USER 101
 
 EXPOSE 8080
