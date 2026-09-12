@@ -4,43 +4,6 @@ import { appState } from "../store/appState.js";
 import MortalityBarRows from "../components/MortalityBarRows.vue";
 import { loadYouBikeDashboard } from "../lib/youbike.js";
 
-/* ===== [Jerry 新增：YouBike 面板狀態開始] =====
-   [本次修復：這段狀態在某次合併中被拿掉了，只留下模板還在用
-   youbikeLoading／youbikeData／youbikeError／youbikeStats，
-   導致 youbikeData 是 undefined，一渲染就整頁報錯白屏。] */
-const youbikeLoading = ref(true);
-const youbikeError = ref("");
-const youbikeData = ref({
-  stationCount: 0,
-  totalDocks: 0,
-  availableBikes: 0,
-  zeroBikeStations: 0,
-  topZeroDistricts: [],
-  updatedAt: "",
-  isSnapshot: true,
-});
-
-const youbikeStats = computed(function () {
-  return [
-    { key: "stations", label: "場站數", value: youbikeData.value.stationCount, unit: "站" },
-    { key: "docks", label: "總停車格", value: youbikeData.value.totalDocks, unit: "格" },
-    { key: "available", label: "可借車輛", value: youbikeData.value.availableBikes, unit: "輛" },
-    { key: "empty", label: "無車可借站", value: youbikeData.value.zeroBikeStations, unit: "站" },
-  ];
-});
-
-onMounted(async function () {
-  try {
-    youbikeData.value = await loadYouBikeDashboard();
-  } catch (error) {
-    console.error(error);
-    youbikeError.value = "YouBike 資料暫時無法讀取，請重新整理頁面。";
-  } finally {
-    youbikeLoading.value = false;
-  }
-});
-/* ===== [Jerry 新增：YouBike 面板狀態結束] ===== */
-
 /* ===== [本次改版：托育／交通稀缺率的「查看全部」改成跟死因統計一樣，
    點整張卡片跳出 modal 顯示全部區域，不再用卡片內的 <details> 展開。
    兩個分類共用同一個 <dialog>，用 activeChartKey 記住目前是哪一類。] */
