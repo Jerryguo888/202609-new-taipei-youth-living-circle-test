@@ -42,14 +42,39 @@ FastAPI (chat 容器, :8000)  app.py
 `KB_SEARCH_MODE` 填錯時後端會接到 `ValidationException`，並自動改用另一種
 search config 重試一次，所以設定寫反不會直接壞掉。
 
-## IAM 權限
+## 部署到 EC2
 
-Instance profile 至少需要：
+### 1. IMDS hop limit 必須是 2（最容易踩的一個）
+
+容器裡的 boto3 是透過 IMDSv2 拿 instance role 憑證。EC2 的
+`http-put-response-hop-limit` 預設是 1，而**從 docker 容器出去會多算一個 hop**，
+所以 token 請求拿不到回應，症狀就是 `Unable to locate credentials`。
+
+```bash
+aws ec2 modify-instance-metadata-options \
+  --instance-id <instance-id> \
+  --http-tokens required \
+  --http-put-response-hop-limit 2
+```
+
+`AWS-s3-KB-Test` 已經在 EC2 上跑通，所以那台機器應該早就設好了；換到新的
+instance 才需要重新設定。部署 workflow 會在最後檢查容器能不能取得憑證，
+拿不到會發 warning 並附上這條指令。
+
+### 2. Instance profile 權限
+
+至少需要：
 
 - `bedrock:InvokeModelWithResponseStream`（對應 `converse_stream`）
-- `bedrock:Retrieve`，資源指向那個知識庫的 ARN
+- `bedrock:Retrieve`，資源指向知識庫的 ARN
 
 知識庫本身讀 S3 是由 Bedrock 的 service role 負責，不是這台機器的角色。
+
+### 3. 跟 AWS-s3-KB-Test 共存
+
+那個專案發佈在 host 的 8001，容器叫 `bedrock-chat`；這裡是 8080（`web`），
+`chat` 不對外開 port，容器名前綴 `nt-youth-living-circle-`，所以兩者可以同時
+在同一台機器上跑，不會撞 port 也不會撞名字。
 
 ## 端點
 

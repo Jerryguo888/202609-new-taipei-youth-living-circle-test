@@ -30,7 +30,10 @@ jobs:
       # rather than secrets, so they stay visible and reviewable.
       AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
       BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' }}
-      KNOWLEDGE_BASE_ID: ${{ vars.KNOWLEDGE_BASE_ID }}
+      # Defaults to the knowledge base already working in AWS-s3-KB-Test, so a
+      # fresh deploy retrieves without needing extra repo setup. Override with a
+      # KNOWLEDGE_BASE_ID repo variable to point at a different one.
+      KNOWLEDGE_BASE_ID: ${{ vars.KNOWLEDGE_BASE_ID || '4HYLRWIZGS' }}
       KB_SEARCH_MODE: ${{ vars.KB_SEARCH_MODE || 'managed' }}
       KB_NUM_RESULTS: ${{ vars.KB_NUM_RESULTS || '5' }}
       MAX_TOKENS: ${{ vars.MAX_TOKENS || '2048' }}
@@ -41,9 +44,13 @@ jobs:
         if: ${{ env.VITE_CARTO_KEY == '' }}
         run: echo "::warning::VITE_CARTO_KEY is not set; the CARTO basemap will use the free/watermarked tier."
 
-      - name: Warn on missing knowledge base
-        if: ${{ env.KNOWLEDGE_BASE_ID == '' }}
-        run: echo "::warning::KNOWLEDGE_BASE_ID is not set; the AI assistant will answer without retrieving from the S3 knowledge base."
+      - name: Report AI assistant config
+        run: |
+          set -euo pipefail
+          echo "Region:         ${AWS_REGION}"
+          echo "Model:          ${BEDROCK_MODEL_ID}"
+          echo "Knowledge base: ${KNOWLEDGE_BASE_ID:-<none, answering without retrieval>}"
+          echo "Search mode:    ${KB_SEARCH_MODE}"
 
       - name: Pull
         run: |
@@ -113,6 +120,23 @@ jobs:
           curl --fail --silent --show-error --max-time 10 \
             "http://127.0.0.1:${port}/api/health" | grep -q '"status":"ok"'
           echo "Smoke test passed on port ${port} (static site + /api proxy)."
+
+      - name: Check the container can obtain AWS credentials
+        # Warning, not a failure: the site and the map work regardless, and the
+        # chat falls back to local canned replies. But this is the single most
+        # common EC2 breakage, so surface it loudly rather than waiting for a
+        # user to hit "Unable to locate credentials" in the chat window.
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          # Kept on one line: unindented lines inside a YAML block scalar would
+          # terminate the block and break the workflow file.
+          probe='import boto3,sys; c=boto3.Session().get_credentials(); sys.exit(1) if c is None else print("credential source:", getattr(c,"method","unknown"))'
+          if docker compose exec -T chat python -c "$probe"; then
+            echo "Container resolved AWS credentials."
+          else
+            echo "::warning::The chat container could not resolve AWS credentials, so Bedrock calls will fail and the assistant will use local fallback replies. On EC2 this is usually the IMDS hop limit: a limit of 1 blocks IMDSv2 from inside a container. Fix with: aws ec2 modify-instance-metadata-options --instance-id <id> --http-put-response-hop-limit 2 --http-tokens required"
+          fi
 
       - name: Prune dangling images
         if: always()
