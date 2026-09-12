@@ -1,0 +1,36 @@
+# Deployment unit for the New Taipei youth living circle site.
+#
+# The app is a fully static SPA, so there is a single service. backend/ is still
+# an empty placeholder; add a second service here once it exists.
+#
+# Local:  cp .env.example .env && docker compose up -d --build
+# Server: driven by .github/workflows/deploy.yml on the self-hosted runner.
+name: nt-youth-living-circle
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Read from the environment (or .env); empty means the CARTO basemap
+        # falls back to the free, watermarked tier.
+        VITE_CARTO_KEY: ${VITE_CARTO_KEY:-}
+    # IMAGE_TAG is set to the commit SHA by CI so each deploy is identifiable
+    # and rollback is just re-running with an older tag.
+    image: ${IMAGE_NAME:-nt-youth-living-circle}:${IMAGE_TAG:-local}
+    container_name: nt-youth-living-circle-web
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8080:8080"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        # Without this, json-file logs grow unbounded and eventually fill the
+        # server's disk.
+        max-size: "10m"
+        max-file: "3"

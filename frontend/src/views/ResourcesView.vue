@@ -86,6 +86,63 @@ function handleChartBackdropClick(event) {
   if (outside) closeChartDialog();
 }
 
+/* ===== [Jerry 新增：YouBike 面板狀態開始] ===== */
+const youbikeLoading = ref(true);
+const youbikeError = ref("");
+const youbikeData = ref({
+  stationCount: 0,
+  totalDocks: 0,
+  availableBikes: 0,
+  zeroBikeStations: 0,
+  allZeroDistricts: [],
+  topZeroDistricts: [],
+  updatedAt: "",
+  isSnapshot: true,
+});
+
+const youbikeStats = computed(function () {
+  return [
+    { key: "stations", label: "場站數", value: youbikeData.value.stationCount, unit: "站" },
+    { key: "docks", label: "總停車格", value: youbikeData.value.totalDocks, unit: "格" },
+    { key: "available", label: "可借車輛", value: youbikeData.value.availableBikes, unit: "輛" },
+    { key: "empty", label: "無車可借站", value: youbikeData.value.zeroBikeStations, unit: "站" },
+  ];
+});
+
+/* ===== [Jerry 修正：零車「行政區排行」放大面板開始] ===== */
+const zeroDistrictPanelOpen = ref(false);
+const zeroDistrictPanel = ref(null);
+const zeroDistrictTrigger = ref(null);
+
+async function openZeroDistrictPanel() {
+  if (youbikeLoading.value || youbikeError.value) return;
+  zeroDistrictPanelOpen.value = true;
+  document.body.classList.add("has-youbike-zero-panel");
+  await nextTick();
+  zeroDistrictPanel.value?.focus();
+}
+
+function closeZeroDistrictPanel() {
+  zeroDistrictPanelOpen.value = false;
+  document.body.classList.remove("has-youbike-zero-panel");
+  nextTick(function () {
+    zeroDistrictTrigger.value?.focus();
+  });
+}
+
+onMounted(async function () {
+  try {
+    youbikeData.value = await loadYouBikeDashboard();
+  } catch (error) {
+    console.error(error);
+    youbikeError.value = "YouBike 資料暫時無法讀取，請重新整理頁面。";
+  } finally {
+    youbikeLoading.value = false;
+  }
+});
+/* ===== [Jerry 修正：零車「行政區排行」放大面板結束] ===== */
+
+/* [保留組員最新版：青年健康指標 dialog 開關與焦點還原] */
 const mortalityDialog = ref(null);
 const mortalityTrigger = ref(null);
 let previousBodyOverflow = "";
@@ -117,6 +174,7 @@ function handleMortalityBackdropClick(event) {
 }
 
 onBeforeUnmount(function () {
+  closeZeroDistrictPanel();
   if (mortalityDialog.value && mortalityDialog.value.open) mortalityDialog.value.close();
   document.body.style.overflow = previousBodyOverflow;
   if (chartDialog.value && chartDialog.value.open) chartDialog.value.close();

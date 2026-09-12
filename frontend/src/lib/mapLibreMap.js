@@ -20,6 +20,27 @@ export function setMapController(nextController) {
   controller = nextController;
 }
 
+/* [2026-09-12 新增：把可視範圍鎖在新北市，避免使用者拖到台灣以外的地方]
+
+   數字是從本專案實際會畫出來的點位反推的（新北公車站牌 33,109 站、新北捷運、
+   台北捷運、行政區中心點），四個極值剛好對上新北的地理極點：
+     西 121.285（林口）  東 122.002（貢寮三貂角）
+     南 24.836（烏來一帶）  北 25.298（石門富貴角）
+   再各往外留約 0.1 度的緩衝，理由有三：
+     1. 烏來區行政範圍往南延伸到約 24.67，但那一帶山區沒有任何資料點；
+     2. pitch 55 的傾斜視角實際看到的地面範圍比正射時大，緩衝可以避免
+        MapLibre 為了把畫面壓進 maxBounds 而強制拉近；
+     3. 台北市與基隆被新北包圍，這個框本來就完整涵蓋，捷運資料不會被切掉。
+   MapLibre 的 maxBounds 只支援矩形，所以這是「外接矩形」而不是實際市界輪廓。 */
+export const NEW_TAIPEI_MAX_BOUNDS = [
+  [121.20, 24.62], // 西南
+  [122.10, 25.40], // 東北
+];
+
+/* 整個新北在 1200px 寬的畫面約 z10 就裝得下，手機窄畫面 fitBounds 會算到約
+   z8.7，所以下限取 8：夠低不會擋住 fitBounds，又不會讓使用者縮到看見全世界。 */
+export const NEW_TAIPEI_MIN_ZOOM = 8;
+
 export let population3dMap = null;
 let population3dLoading = false;
 export let population3dBaseReady = false;
@@ -604,6 +625,9 @@ export async function initPopulation3dMap() {
       pitch: 55,
       bearing: -10,
       antialias: true,
+      /* [2026-09-12 新增：鎖定在新北市範圍內] */
+      maxBounds: NEW_TAIPEI_MAX_BOUNDS,
+      minZoom: NEW_TAIPEI_MIN_ZOOM,
     });
     population3dMap.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
 
