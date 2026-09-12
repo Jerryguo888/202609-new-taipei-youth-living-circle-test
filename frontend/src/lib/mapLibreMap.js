@@ -95,6 +95,7 @@ let population3dLoading = false;
 export let population3dBaseReady = false;
 export let population3dBounds = null;
 let integratedTransitReady = false;
+let integratedAnimationFocus = false;
 let popByYearRef = {};
 
 /* [本次改版：拿掉年份滑桿，圖例的年齡層／可及性選取狀態改由這裡集中管理，
@@ -104,7 +105,8 @@ export const AGE_GROUP_COLORS = ["#24d7ff", "#ff4f9a", "#ffd447"];
 let redrawBars = null;
 
 export function redrawPopulationBars(selectedAges) {
-  if (redrawBars) redrawBars(selectedAges);
+  /* 動畫期間來源資料也保持空白，避免只靠 visibility 時被圖例重繪帶回最後一根柱。 */
+  if (redrawBars) redrawBars(integratedAnimationFocus ? [] : selectedAges);
 }
 
 /* [Jerry 2026-09-13 改版：基礎公車／捷運圖層分組，30 分鐘結果維持獨立。]
@@ -130,6 +132,10 @@ const INTEGRATED_TRANSIT_LAYER_IDS = [
   ...INTEGRATED_BUS_LAYER_IDS,
   ...INTEGRATED_METRO_LAYER_IDS,
   ...INTEGRATED_ANALYSIS_LAYER_IDS,
+];
+const INTEGRATED_CONTEXT_LAYER_IDS = [
+  "pop-bars-layer",
+  "district-label-layer",
 ];
 
 /* ===== [2026-09-11 新增：3D 人口圖上的公車／捷運／30 分鐘路網開始] ===== */
@@ -192,8 +198,9 @@ function setIntegratedLayerGroupVisibility(layerIds, visible) {
 
 export function setIntegratedTransitVisibility(busVisible, metroVisible) {
   if (!population3dMap || !integratedTransitReady) return;
-  const showBus = busVisible !== false;
-  const showMetro = metroVisible !== false;
+  /* 動畫專注模式優先於圖例勾選，避免計算途中把大量灰點重新顯示出來。 */
+  const showBus = !integratedAnimationFocus && busVisible !== false;
+  const showMetro = !integratedAnimationFocus && metroVisible !== false;
   setIntegratedLayerGroupVisibility(INTEGRATED_BUS_LAYER_IDS, showBus);
   setIntegratedLayerGroupVisibility(INTEGRATED_METRO_LAYER_IDS, showMetro);
   const mapElement = document.getElementById("population-3d-map");
@@ -204,6 +211,28 @@ export function setIntegratedTransitVisibility(busVisible, metroVisible) {
       ? "visible"
       : showBus || showMetro ? "partial" : "hidden";
   }
+}
+
+/* [Jerry 2026-09-13 新增：30 分鐘動畫專注模式]
+   開始計算時隱藏人口柱、行政區文字及全部基礎交通標點，只留下底圖、起點、
+   可達路線與逐分鐘跑點；重新選站或重設鏡位時再依原圖例狀態恢復。 */
+export function setIntegratedAnimationFocus(active) {
+  integratedAnimationFocus = active === true;
+  if (!population3dMap) return;
+  /* 除了隱藏圖層，也清空柱狀來源；離開專注模式時再依目前勾選狀態重建。 */
+  if (redrawBars) {
+    const selectedAges = controller && Array.isArray(controller.selectedAgeGroups)
+      ? controller.selectedAgeGroups
+      : AGE_GROUPS;
+    redrawBars(integratedAnimationFocus ? [] : selectedAges);
+  }
+  setIntegratedLayerGroupVisibility(INTEGRATED_CONTEXT_LAYER_IDS, !integratedAnimationFocus);
+  setIntegratedTransitVisibility(
+    controller ? controller.showBusStops : true,
+    controller ? controller.showMetroStops : true,
+  );
+  const mapElement = document.getElementById("population-3d-map");
+  if (mapElement) mapElement.dataset.animationFocus = integratedAnimationFocus ? "active" : "inactive";
 }
 
 function bindIntegratedPointerLayer(layerId) {
@@ -396,7 +425,14 @@ export function ensureIntegratedTransitLayers() {
   ["integrated-bus-cluster-hit", "integrated-bus-stop-hit", "integrated-metro-stations", "integrated-result-points"].forEach(bindIntegratedPointerLayer);
 }
 
-export function clearIntegratedResults(clearOrigin) {
+export function clearIntegratedResults(clearOrigin, restoreContext) {
+  /* [Jerry 2026-09-13 修正：清空時一併停止尚未結束的逐分鐘動畫，
+     否則下一個 tick 會把已清掉的可達節點重新寫回來源。] */
+  if (animateIntegratedTimer !== null) {
+    clearTimeout(animateIntegratedTimer);
+    animateIntegratedTimer = null;
+  }
+  if (restoreContext !== false) setIntegratedAnimationFocus(false);
   setIntegratedSourceData("integrated-result-line-source", emptyFeatureCollection());
   setIntegratedSourceData("integrated-result-point-source", emptyFeatureCollection());
   if (clearOrigin !== false) setIntegratedSourceData("integrated-origin-source", emptyFeatureCollection());
@@ -475,7 +511,8 @@ let animateIntegratedTimer = null;
 
 export function animateIntegratedResult(result) {
   if (!integratedTransitReady) return;
-  clearIntegratedResults(false);
+  clearIntegratedResults(false, false);
+  setIntegratedAnimationFocus(true);
   const collections = integratedResultCollections(result);
   setIntegratedSourceData("integrated-result-line-source", collections.lines);
   const start = transitNodes.get(result.startId);
@@ -520,6 +557,7 @@ export function animateIntegratedResult(result) {
    時同一個板橋定位，而不是每次都跳回城市置中。] */
 export function resetPopulationMapView() {
   if (!population3dMap) return;
+  setIntegratedAnimationFocus(false);
   population3dMap.easeTo({
     center: computeBanqiaoShiftedCenter(population3dMap),
     zoom: BANQIAO_DEFAULT_ZOOM,

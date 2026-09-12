@@ -122,6 +122,7 @@ export const appState = reactive({
   animationSpeed: 2,
   minuteLimit: 30,
   animationClock: "00:00",
+  reachabilityActive: false,
   metrics: { ...EMPTY_METRICS },
   /* [Jerry 2026-09-13 改版：公車站與捷運站圖層分開管理，預設都開啟。] */
   showBusStops: true,
@@ -239,6 +240,14 @@ export const appState = reactive({
   resetPopulationMapView() {
     resetPopulationMapView();
   },
+  /* [Jerry 2026-09-13 新增：只清空 30 分鐘分析產生的路線與可達節點，
+     保留目前選定的出發站，並恢復人口柱及基礎公車／捷運圖層。] */
+  clearReachability() {
+    this.reachabilityActive = false;
+    this.animationClock = "00:00";
+    this.metrics = { ...EMPTY_METRICS };
+    clearIntegratedResults(false);
+  },
   /* [Jerry 2026-09-13 改版：兩個勾選框可獨立控制公車與捷運基礎圖層。] */
   toggleTransitLayer(mode, visible) {
     if (mode === "bus") this.showBusStops = visible;
@@ -249,7 +258,7 @@ export const appState = reactive({
   toggleAgeGroup(age, visible) {
     const index = this.selectedAgeGroups.indexOf(age);
     if (!visible) {
-      if (this.selectedAgeGroups.length === 1) return; // 至少保留一項，跟原本圖例邏輯一致
+      /* [Jerry 2026-09-13 修正：允許取消最後一個項目，才能真正清空所有人口柱。] */
       if (index >= 0) this.selectedAgeGroups.splice(index, 1);
     } else if (index < 0) {
       this.selectedAgeGroups.push(age);
@@ -349,6 +358,7 @@ export const appState = reactive({
       this.activeDistrict = node.district;
     }
     this.selectedStartId = nodeId;
+    this.reachabilityActive = false;
     this.metrics = { ...EMPTY_METRICS };
     clearIntegratedResults(false);
     drawIntegratedOrigin(node, moveMap);
@@ -357,6 +367,7 @@ export const appState = reactive({
     this.stopMode = "bus";
     this.activeDistrict = district;
     this.selectedStartId = null;
+    this.reachabilityActive = false;
     this.metrics = { ...EMPTY_METRICS };
     clearIntegratedResults();
     focusIntegratedNodes(this.activeDistrictStops, 13);
@@ -365,6 +376,7 @@ export const appState = reactive({
     this.stopMode = "metro";
     this.activeMetroLine = lineId;
     this.selectedStartId = null;
+    this.reachabilityActive = false;
     this.metrics = { ...EMPTY_METRICS };
     clearIntegratedResults();
     focusIntegratedNodes(this.activeMetroStops, 13);
@@ -372,6 +384,7 @@ export const appState = reactive({
   selectStopMode(mode) {
     this.stopMode = mode;
     this.selectedStartId = null;
+    this.reachabilityActive = false;
     this.metrics = { ...EMPTY_METRICS };
     clearIntegratedResults();
     const stops = mode === "metro" ? this.activeMetroStops : this.activeDistrictStops;
@@ -391,6 +404,7 @@ export const appState = reactive({
       distance: result.farthestKm.toFixed(1) + " km",
       wait: minWait.toFixed(1) + " 分",
     };
+    this.reachabilityActive = true;
     animateIntegratedResult(result);
   },
   localChatReply(text) {

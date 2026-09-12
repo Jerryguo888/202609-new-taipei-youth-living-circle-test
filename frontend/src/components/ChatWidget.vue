@@ -9,6 +9,10 @@ const messagesEl = ref(null);
 const chatPanelEl = ref(null);
 const chatInputEl = ref(null);
 const chatLauncherEl = ref(null);
+const planPanelEl = ref(null);
+const planChartHtml = ref("");
+const planChartKey = ref("");
+let planChartTrigger = null;
 
 function handleSend() {
   appState.sendChat(messagesEl.value);
@@ -32,10 +36,38 @@ function revealMessage(message) {
 }
 
 function closeChat() {
+  closePlanChart(false);
   appState.chatOpen = false;
   nextTick(function () {
     chatLauncherEl.value?.focus();
   });
+}
+
+/* [Jerry 2026-09-13 改版：AI 圖表不再擠在訊息氣泡裡；訊息改顯示
+   「規劃展示」按鈕，點擊後在聊天室左側開啟較大的閱讀面板。] */
+function openPlanChart(chart, key, event) {
+  planChartHtml.value = chart;
+  planChartKey.value = key;
+  planChartTrigger = event.currentTarget;
+  nextTick(function () {
+    planPanelEl.value?.focus();
+  });
+}
+
+function closePlanChart(returnFocus = true) {
+  const trigger = planChartTrigger;
+  planChartHtml.value = "";
+  planChartKey.value = "";
+  planChartTrigger = null;
+  if (returnFocus && trigger) nextTick(function () { trigger.focus(); });
+}
+
+function handleChatEscape() {
+  if (planChartHtml.value) {
+    closePlanChart();
+    return;
+  }
+  closeChat();
 }
 
 /* [2026-09-12 新增：知識庫來源是 s3://bucket/key，只取檔名顯示比較好讀。] */
@@ -51,7 +83,10 @@ function sourceFileName(uri) {
 
 /* [Jerry 改版：右側手機型聊天室開啟後聚焦輸入框，並顯示最新一則訊息。] */
 watch(function () { return appState.chatOpen; }, async function (isOpen) {
-  if (!isOpen) return;
+  if (!isOpen) {
+    closePlanChart(false);
+    return;
+  }
   await nextTick();
   chatPanelEl.value?.focus();
   chatInputEl.value?.focus();
@@ -63,9 +98,9 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
   <!-- ===== [Jerry 改版：右側手機型 AI 聊天室開始] ===== -->
   <Teleport to="body">
     <Transition name="chat-drawer">
-      <section v-if="appState.chatOpen" id="chat-panel" ref="chatPanelEl" tabindex="-1"
-               class="chat-panel" role="dialog" aria-labelledby="chat-title"
-               @keydown.esc="closeChat">
+      <div v-if="appState.chatOpen" class="chat-shell" @keydown.esc.stop="handleChatEscape">
+        <section id="chat-panel" ref="chatPanelEl" tabindex="-1"
+                 class="chat-panel" role="dialog" aria-labelledby="chat-title">
         <header class="chat-header">
           <div class="chat-title-group">
             <strong id="chat-title">生活圈 AI 對話</strong>
@@ -98,14 +133,20 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
                   <div v-if="message.role === 'assistant' && message.text"
                        class="message-markdown" v-html="renderAssistantMarkdown(message.text)"></div>
                   <p v-else-if="message.text">{{ message.text }}</p>
-                  <!-- [2026-09-12 新增：模型畫的圖表。
-                       這是另一種只屬於 AI 回覆的 v-html。內容已在 lib/chartHtml.js
-                       以 DOMPurify 白名單消毒：只留規定的標籤與 class，style 僅允許
-                       width 百分比。模型讀得到 S3 知識庫，而知識庫內容屬於不可信
-                       輸入（可能被塞提示注入），所以這道消毒不能省。 -->
+                  <!-- [Jerry 2026-09-13 改版：只有 assistant 的已消毒圖表能進入展示流程；
+                       聊天氣泡內只留「規劃展示」按鈕，圖表本體在聊天室左側顯示。] -->
                   <template v-if="message.role === 'assistant'">
-                    <div v-for="(chart, chartIndex) in (message.charts || [])"
-                         :key="'chart-' + chartIndex" class="ai-chart-wrap" v-html="chart"></div>
+                    <button v-for="(chart, chartIndex) in (message.charts || [])"
+                            :key="'chart-' + chartIndex" type="button" class="chat-plan-button"
+                            :aria-expanded="planChartKey === index + '-' + chartIndex"
+                            aria-haspopup="dialog" aria-controls="chat-plan-panel"
+                            :aria-label="'開啟規劃展示' + ((message.charts || []).length > 1 ? ' ' + (chartIndex + 1) : '')"
+                            @click="openPlanChart(chart, index + '-' + chartIndex, $event)">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 19V9m6 10V5m6 14v-7m4 7H2"></path>
+                      </svg>
+                      <span>規劃展示</span>
+                    </button>
                   </template>
                   <!-- [2026-09-12 新增：這次回答讀了哪些資料。AI 是自己決定要查什麼的，
                        把它的選擇攤開來，使用者才判斷得出數字可不可信。] -->
@@ -160,7 +201,29 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
             </button>
           </div>
         </footer>
-      </section>
+        </section>
+      </div>
+    </Transition>
+
+    <!-- [Jerry 2026-09-13 新增：桌面版位於聊天室左側；窄螢幕改為安全留邊的覆蓋面板。] -->
+    <Transition name="chat-plan-panel">
+      <aside v-if="appState.chatOpen && planChartHtml" id="chat-plan-panel" ref="planPanelEl"
+             class="chat-plan-panel" tabindex="-1" role="dialog" aria-labelledby="chat-plan-title"
+             @keydown.esc="closePlanChart">
+        <header class="chat-plan-header">
+          <div>
+            <small>AI 規劃結果</small>
+            <strong id="chat-plan-title">規劃展示</strong>
+          </div>
+          <button type="button" class="chat-plan-close" aria-label="關閉規劃展示" @click="closePlanChart">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18"></path>
+            </svg>
+          </button>
+        </header>
+        <!-- 圖表字串已由 chartHtml.js 的 DOMPurify 白名單處理。 -->
+        <div class="chat-plan-body" v-html="planChartHtml"></div>
+      </aside>
     </Transition>
   </Teleport>
 
