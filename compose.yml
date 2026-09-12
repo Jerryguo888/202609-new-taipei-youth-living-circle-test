@@ -22,12 +22,7 @@ services:
     container_name: nt-youth-living-circle-web
     restart: unless-stopped
     ports:
-      # Container port is fixed at 8080 (non-root nginx). Only the host port is
-      # configurable — set WEB_PORT=80 to serve directly, or leave it on 8080
-      # and put a TLS-terminating reverse proxy in front.
-      - "${WEB_PORT:-8080}:8080"
-    # HEALTHCHECK is defined in the Dockerfile and inherited here, so `docker
-    # compose ps` and the deploy workflow both see real health status.
+      - "0.0.0.0:8080:8080"
     security_opt:
       - no-new-privileges:true
     cap_drop:
