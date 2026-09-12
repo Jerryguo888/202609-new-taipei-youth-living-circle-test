@@ -9,8 +9,8 @@
      1. 白名單：標籤、class、style 都只留規定內的，其餘一律丟掉。
      2. DOMPurify：不自己手刻 HTML parser，避免各種畸形標記的繞過手法。
 
-   對話本文（散文）完全不走這條路，仍然用 Vue 的 {{ }} 純文字輸出，
-   只有圍籬區塊裡的圖表會被當成 HTML。
+   對話本文由 assistantMarkdown.js 走另一套 Markdown 白名單；這裡只負責
+   assistant 回覆中 ```chart 圍籬區塊的 HTML，不處理使用者文字。
 
    [重要] 下面的白名單必須跟 backend/app.py 的 CHART_INSTRUCTIONS 一致。
    改一邊沒改另一邊，圖表就會被清掉一部分。 */
