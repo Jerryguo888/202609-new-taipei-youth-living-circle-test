@@ -4,43 +4,6 @@ import { appState } from "../store/appState.js";
 import MortalityBarRows from "../components/MortalityBarRows.vue";
 import { loadYouBikeDashboard } from "../lib/youbike.js";
 
-/* ===== [Jerry 新增：YouBike 面板狀態開始] =====
-   [本次修復：這段狀態在某次合併中被拿掉了，只留下模板還在用
-   youbikeLoading／youbikeData／youbikeError／youbikeStats，
-   導致 youbikeData 是 undefined，一渲染就整頁報錯白屏。] */
-const youbikeLoading = ref(true);
-const youbikeError = ref("");
-const youbikeData = ref({
-  stationCount: 0,
-  totalDocks: 0,
-  availableBikes: 0,
-  zeroBikeStations: 0,
-  topZeroDistricts: [],
-  updatedAt: "",
-  isSnapshot: true,
-});
-
-const youbikeStats = computed(function () {
-  return [
-    { key: "stations", label: "場站數", value: youbikeData.value.stationCount, unit: "站" },
-    { key: "docks", label: "總停車格", value: youbikeData.value.totalDocks, unit: "格" },
-    { key: "available", label: "可借車輛", value: youbikeData.value.availableBikes, unit: "輛" },
-    { key: "empty", label: "無車可借站", value: youbikeData.value.zeroBikeStations, unit: "站" },
-  ];
-});
-
-onMounted(async function () {
-  try {
-    youbikeData.value = await loadYouBikeDashboard();
-  } catch (error) {
-    console.error(error);
-    youbikeError.value = "YouBike 資料暫時無法讀取，請重新整理頁面。";
-  } finally {
-    youbikeLoading.value = false;
-  }
-});
-/* ===== [Jerry 新增：YouBike 面板狀態結束] ===== */
-
 /* ===== [本次改版：托育／交通稀缺率的「查看全部」改成跟死因統計一樣，
    點整張卡片跳出 modal 顯示全部區域，不再用卡片內的 <details> 展開。
    兩個分類共用同一個 <dialog>，用 activeChartKey 記住目前是哪一類。] */
@@ -267,7 +230,7 @@ onBeforeUnmount(function () {
                   </strong>
                 </div>
                 <p id="mortality-chart-description">
-                  各行政區自殺死亡數占同齡全部死因死亡數的比例；點擊圖表查看全部29區。
+                  各行政區自殺死亡數占同齡全部死因死亡數的比例。
                 </p>
               </div>
               <p v-if="appState.mortalityLoading" class="resource-chart-status">
@@ -307,7 +270,17 @@ onBeforeUnmount(function () {
             </article>
           </div>
 
-          <article class="youbike-ranking-card">
+          <!-- [本次改版：跟托育／交通稀缺率、死因統計一樣，點整張卡片可以查看
+               所有 29 區的完整排行，不只前五區；點開的放大視窗沿用 Jerry 已經
+               準備好的 .youbike-zero-panel 樣式，只是原本沒有接上任何觸發點。] -->
+          <article ref="zeroDistrictTrigger" class="youbike-ranking-card mortality-chart-card"
+                   :class="{ 'is-disabled': youbikeLoading || youbikeError || !youbikeData.allZeroDistricts.length }"
+                   :tabindex="(youbikeLoading || youbikeError || !youbikeData.allZeroDistricts.length) ? -1 : 0"
+                   :aria-disabled="youbikeLoading || youbikeError || !youbikeData.allZeroDistricts.length"
+                   role="button" aria-haspopup="dialog" aria-describedby="youbike-ranking-description"
+                   @click="openZeroDistrictPanel"
+                   @keydown.enter="openZeroDistrictPanel"
+                   @keydown.space.prevent="openZeroDistrictPanel">
             <div class="youbike-ranking-head">
               <div>
                 <h3>無車可借場站數前五區</h3>
@@ -324,9 +297,43 @@ onBeforeUnmount(function () {
               </li>
             </ol>
             <p v-else class="youbike-ranking-empty">{{ youbikeLoading ? "正在統計 29 區站點…" : "目前沒有排行資料" }}</p>
+            <div v-if="!youbikeLoading && youbikeData.allZeroDistricts.length" class="mortality-chart-footer">
+              <p id="youbike-ranking-description">無車可借場站數＝該區目前可借車輛為 0 的場站數。</p>
+              <span>查看全部29區</span>
+            </div>
           </article>
         </section>
         <!-- ===== [Jerry 新增：YouBike 公共資源面板結束] ===== -->
+
+        <!-- ===== [Jerry 修正：無車可借行政區排行置中放大視窗——補上模板，
+             CSS 早就準備好了但沒有任何地方 v-if 開啟過，等於是死掉的樣式] ===== -->
+        <Transition name="youbike-panel">
+          <div v-if="zeroDistrictPanelOpen" class="youbike-zero-backdrop" @click.self="closeZeroDistrictPanel">
+            <div ref="zeroDistrictPanel" class="youbike-zero-panel" role="dialog" aria-modal="true"
+                 aria-labelledby="youbike-zero-panel-title" tabindex="-1" @keydown.esc="closeZeroDistrictPanel">
+              <header class="youbike-zero-panel-head">
+                <div>
+                  <h2 id="youbike-zero-panel-title">無車可借場站數</h2>
+                  <p id="mortality-chart-description">
+                    各行政區自殺死亡數占同齡全部死因死亡數的比例。
+                  </p>
+                </div>
+                <div class="youbike-zero-panel-actions">
+                  <button type="button" class="is-close" @click="closeZeroDistrictPanel">x</button>
+                </div>
+              </header>
+              <ul class="youbike-zero-district-list">
+                <li v-for="row in youbikeData.allZeroDistricts" :key="row.district" :class="{ 'is-zero': row.count === 0 }">
+                  <strong>{{ row.district }}</strong>
+                  <span class="youbike-zero-district-track" aria-hidden="true">
+                    <i :style="{ width: row.widthPercent + '%' }"></i>
+                  </span>
+                  <b>{{ row.count }}<small>站</small></b>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </Transition>
       </div>
     </div>
 

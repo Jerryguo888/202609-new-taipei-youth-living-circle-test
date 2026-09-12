@@ -108,7 +108,8 @@
     .page-container {
       width: min(1600px, calc(100% - 28px));
       margin: 0 auto;
-      padding: 0 0 42px;
+      /* padding: 0 0 42px; */
+      background-color: #0b0e14;
     }
 
     .view { min-height: 100vh; }
@@ -555,7 +556,7 @@
       height: 11px;
       overflow: hidden;
       border-radius: 999px;
-      background: #d9dedb;
+      background: #2b3331;
     }
 
     .youbike-ranking-track i {
@@ -629,11 +630,10 @@
       justify-content: space-between;
       gap: 16px;
       padding: 20px 18px 16px;
-      border-bottom: 1px solid rgba(255,255,255,.09);
     }
 
     .youbike-zero-panel-head p {
-      margin: 0 0 5px;
+      margin: 8px 0 0;
       color: #8fa099;
       font-size: .64rem;
       font-weight: 780;
@@ -691,11 +691,16 @@
       scrollbar-color: #46524d transparent;
     }
 
+    /* [本次改版：排名 <span class="youbike-zero-district-rank"> 已經拿掉了，
+       每列現在只剩 3 個子元素（名稱／長條／數量），但 grid-template-columns
+       還定義著原本 4 欄，會導致「行政區名稱」被塞進原本留給排名的第一欄
+       （只有 30px 寬），被截斷成兩行。改成對應現在 3 個子元素的欄位設定，
+       這裡欄位比較寬鬆（modal 有 900px 可用），名稱欄給足夠空間。] */
     .youbike-zero-district-list li {
       display: grid;
-      grid-template-columns: 30px 62px minmax(70px, 1fr) 50px;
+      grid-template-columns: 90px minmax(60px, 1fr) 60px;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       padding: 13px 11px;
       border: 1px solid rgba(255,255,255,.08);
       border-radius: 12px;
@@ -710,7 +715,7 @@
     }
 
     .youbike-zero-district-list li > strong {
-      color: #55e6cf;
+      color: #aebcb7;
       font-size: .78rem;
     }
 
@@ -725,7 +730,7 @@
       display: block;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #55e6cf, #f4bf22);
+      background: #bb71ff;
     }
 
     .youbike-zero-district-list li.is-zero { background: #151a1e; }
@@ -1020,7 +1025,6 @@
          也不能用固定的 height:100vh（內容比視窗高時會被裁掉），要用 min-height。] */
       box-sizing: border-box;
       width: 100vw;
-      min-height: 100vh;
       margin-left: calc(50% - 50vw);
       padding: 0 calc(50vw - 50%) 40px;
       background: #0b0e14;
@@ -1080,8 +1084,8 @@
     .mortality-dialog-panel .resource-chart-legend li.is-public i { background: var(--forest-2); }
     .mortality-dialog-panel .resource-chart-legend li.is-private i { background: var(--teal); }
     .mortality-dialog-panel .resource-chart-label { color:#aebcb7; }
-    .mortality-dialog-panel .resource-chart-bar { background: #edf1ef; }
-    .mortality-dialog-panel .resource-chart-row:hover .resource-chart-bar { background: #e3ebe7; }
+    .mortality-dialog-panel .resource-chart-bar { background: #2b3331;}
+    /* .mortality-dialog-panel .resource-chart-row:hover .resource-chart-bar { background: #e3ebe7; } */
     .mortality-dialog-panel .resource-chart-bar.is-childcare i.is-public { background: var(--forest-2); }
     .mortality-dialog-panel .resource-chart-bar.is-childcare i.is-private { background: var(--teal); }
     .mortality-dialog-panel .resource-chart-bar.is-transit i { background: #eab308; }
