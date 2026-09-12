@@ -23,6 +23,17 @@ function closeChat() {
   });
 }
 
+/* [2026-09-12 新增：知識庫來源是 s3://bucket/key，只取檔名顯示比較好讀。] */
+function sourceFileName(uri) {
+  if (!uri) return "（未知來源）";
+  const name = uri.split("/").pop() || uri;
+  try {
+    return decodeURIComponent(name);
+  } catch (error) {
+    return name;
+  }
+}
+
 /* [Jerry 改版：全畫面聊天室開啟時鎖住底層頁面，並把焦點移到輸入框。] */
 watch(function () { return appState.chatOpen; }, async function (isOpen) {
   document.body.classList.toggle("has-chat-open", isOpen);
@@ -49,7 +60,8 @@ onBeforeUnmount(function () {
             <span class="chat-mark" aria-hidden="true">AI</span>
             <div>
               <strong id="chat-title">生活圈 AI 助理</strong>
-              <span>DEMO · 尚未連接 AWS 模型</span>
+              <!-- [2026-09-12 改版：已接上 Bedrock，標示改成實際的服務組成。] -->
+              <span>Amazon Bedrock · S3 知識庫</span>
             </div>
           </div>
           <button type="button" class="chat-close" @click="closeChat" aria-label="關閉生活圈 AI 助理">
@@ -63,6 +75,16 @@ onBeforeUnmount(function () {
                  v-for="(message, index) in appState.chatMessages" :key="index">
               <small>{{ message.role === "user" ? "你" : "AI 助理" }}</small>
               <p>{{ message.text }}</p>
+              <!-- [2026-09-12 新增：知識庫引用來源。S3 的 s3:// URI 在瀏覽器點不開，
+                   所以只顯示檔名，避免給出一個按了沒反應的連結。] -->
+              <details v-if="message.sources && message.sources.length" class="chat-sources">
+                <summary>參考來源（{{ message.sources.length }}）</summary>
+                <ol>
+                  <li v-for="(source, sourceIndex) in message.sources" :key="sourceIndex">
+                    {{ sourceFileName(source.uri) }}
+                  </li>
+                </ol>
+              </details>
             </div>
             <!-- [Jerry 改版：非同步 AI 回覆期間顯示三點跳動氣泡，之後串 AWS API 不需重做版面。] -->
             <div v-if="appState.chatLoading" class="message typing-message" role="status" aria-label="AI 助理正在回覆">
@@ -88,7 +110,7 @@ onBeforeUnmount(function () {
               <span>送出</span><b aria-hidden="true">↑</b>
             </button>
           </div>
-          <p class="chat-connection-note">目前使用前端示範回覆；AWS AI 服務開放後將由同一個輸入框串接。</p>
+          <p class="chat-connection-note">回覆由 Amazon Bedrock 生成，並優先引用 S3 知識庫的資料；雲端無法連線時會自動改用本機情境回覆。</p>
         </footer>
       </section>
     </Transition>

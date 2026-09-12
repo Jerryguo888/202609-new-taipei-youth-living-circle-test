@@ -34,3 +34,40 @@ services:
         # server's disk.
         max-size: "10m"
         max-file: "3"
+    depends_on:
+      # nginx proxies /api/ to the chat service. Only ordering is guaranteed
+      # here, not readiness — nginx resolves the upstream lazily per request,
+      # so a slow-starting backend just yields a 502 on early calls instead of
+      # preventing the static site from coming up.
+      - chat
+
+  # AI 助理後端：Bedrock + S3 知識庫。沒有 published port，只能透過 web
+  # 容器的 /api/ 反向代理進來，所以不會多開一個對外的攻擊面。
+  chat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ${IMAGE_NAME:-nt-youth-living-circle}-chat:${IMAGE_TAG:-local}
+    container_name: nt-youth-living-circle-chat
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      # 憑證走 EC2 IAM Role，boto3 自己透過 IMDS 取得。這裡不要放 access key。
+      AWS_REGION: ${AWS_REGION:-us-west-2}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-us.anthropic.claude-sonnet-4-5-20250929-v1:0}
+      MAX_TOKENS: ${MAX_TOKENS:-2048}
+      # 留空就只用模型回答，不接知識庫。
+      KNOWLEDGE_BASE_ID: ${KNOWLEDGE_BASE_ID:-}
+      KB_NUM_RESULTS: ${KB_NUM_RESULTS:-5}
+      KB_SEARCH_MODE: ${KB_SEARCH_MODE:-managed}
+      SYSTEM_PROMPT: ${SYSTEM_PROMPT:-}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

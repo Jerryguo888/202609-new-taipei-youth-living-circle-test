@@ -1,0 +1,6 @@
+# 版本對齊參考專案 AWS-s3-KB-Test，避免兩邊行為不一致。
+# boto3 1.43.93 才有 retrieve 的 managedSearchConfiguration（S3 Vectors 受管知識庫）。
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+boto3==1.43.93
+pydantic==2.10.4

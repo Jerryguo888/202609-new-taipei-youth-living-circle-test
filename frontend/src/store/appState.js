@@ -32,6 +32,11 @@ import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
 
 const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—" };
 
+/* [2026-09-12 新增：串流回覆會反覆更新同一則訊息，捲動邏輯抽出來共用。] */
+function scrollChatToBottom(messagesEl) {
+  if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
 /* [本次改版：3D人口／30分鐘交通／預算模擬／青年熱區各自的獨立分頁都拿掉了，
    青年熱區排行、圖例、交通分析三塊改整合進「整合地圖」左側面板，共用同一份
    reactive() 狀態，取代原本每個分頁各自的 data()。] */
@@ -358,39 +363,82 @@ export const appState = reactive({
   localChatReply(text) {
     return localChatReply(text);
   },
-  async getChatReply(text) {
-    return getChatReplyService(text, {
-      activeView: this.activeView,
-      minuteLimit: this.minuteLimit,
-    });
+  async getChatReply(text, options) {
+    return getChatReplyService(
+      text,
+      {
+        activeView: this.activeView,
+        minuteLimit: this.minuteLimit,
+      },
+      options,
+    );
   },
   async sendChat(messagesEl) {
     const text = this.chatInput.trim();
     if (!text || this.chatLoading) return;
+
+    /* [2026-09-12 改版：接上 Bedrock 之後要送完整對話脈絡，模型才能接續前文。
+       先複製一份「還不含這次輸入」的歷史，這次的輸入由 chatService 自己補在最後。] */
+    const history = this.chatMessages.map(function (message) {
+      return { role: message.role, text: message.text };
+    });
+
     this.chatMessages.push({ role: "user", text: text });
     this.chatInput = "";
     this.chatLoading = true;
     await nextTick();
-    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollChatToBottom(messagesEl);
 
-    /* [Jerry 改版：現在由前端情境回覆示範；未來 getChatReply 接 AWS AI 後，
-       跳動氣泡會自然維持到真正回覆完成。最短顯示時間避免本機回覆快到看不見。] */
+    /* [Jerry 改版保留：最短載入時間避免氣泡一閃而過。
+       [2026-09-12 改版：真的有串流時就不需要這個保護，第一個 token 一到就
+       直接把跳動氣泡換成逐字增長的回覆；只有本機回覆或失敗才補足時間。] */
     const loadingStartedAt = Date.now();
-    let answer;
-    try {
-      answer = await this.getChatReply(text);
-    } catch (error) {
-      answer = "雲端服務目前未開放，我先使用本機情境回覆。";
-    }
     const minimumLoadingTime = 560;
-    const loadingTimeLeft = minimumLoadingTime - (Date.now() - loadingStartedAt);
-    if (loadingTimeLeft > 0) {
-      await new Promise(function (resolve) { setTimeout(resolve, loadingTimeLeft); });
+    const store = this;
+    let streamingMessage = null;
+
+    function handleDelta(delta, full) {
+      if (!streamingMessage) {
+        store.chatLoading = false;
+        streamingMessage = { role: "assistant", text: "", sources: [] };
+        store.chatMessages.push(streamingMessage);
+      }
+      streamingMessage.text = full;
+      nextTick(function () { scrollChatToBottom(messagesEl); });
     }
-    this.chatLoading = false;
-    this.chatMessages.push({ role: "assistant", text: answer });
+
+    let reply;
+    try {
+      reply = await this.getChatReply(text, { history: history, onDelta: handleDelta });
+    } catch (error) {
+      /* 雲端不通時仍然給得出東西：附上原因，再退回本機情境回覆。 */
+      reply = {
+        text: localChatReply(text),
+        sources: [],
+        notice: error && error.message ? error.message : "聊天服務暫時無法使用",
+      };
+    }
+
+    if (streamingMessage) {
+      this.chatLoading = false;
+      streamingMessage.text = reply.text || streamingMessage.text;
+      streamingMessage.sources = reply.sources || [];
+      if (reply.partialError) {
+        streamingMessage.text += "\n\n（回覆中斷：" + reply.partialError + "）";
+      }
+    } else {
+      const loadingTimeLeft = minimumLoadingTime - (Date.now() - loadingStartedAt);
+      if (loadingTimeLeft > 0) {
+        await new Promise(function (resolve) { setTimeout(resolve, loadingTimeLeft); });
+      }
+      this.chatLoading = false;
+      let body = reply.text;
+      if (reply.notice) body += "\n\n（" + reply.notice + "，以上為本機情境回覆）";
+      this.chatMessages.push({ role: "assistant", text: body, sources: reply.sources || [] });
+    }
+
     await nextTick();
-    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollChatToBottom(messagesEl);
   },
 });
 

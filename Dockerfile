@@ -45,6 +45,7 @@ COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 # Kept outside conf.d so nginx.conf's `include /etc/nginx/conf.d/*.conf` does
 # not pick the snippet up as a standalone server config.
 COPY docker/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
+COPY docker/nginx/proxy-chat.conf /etc/nginx/snippets/proxy-chat.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Fail the build on a bad config instead of at rollout time.

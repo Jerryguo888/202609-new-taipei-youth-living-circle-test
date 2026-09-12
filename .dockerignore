@@ -26,9 +26,12 @@ frontend/dist
 **/.env.*
 !**/.env.example
 
+# The chat service builds from ./backend with its own context, so the web
+# image never needs these files.
+backend
+
 # Docs and container files that don't affect the build
 README.md
-backend/README.md
 frontend/README.md
 Dockerfile
 compose.yml

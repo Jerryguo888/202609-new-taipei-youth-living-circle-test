@@ -25,12 +25,25 @@ jobs:
       # `compose build`. Without it the CARTO basemap silently falls back to the
       # free, watermarked tier.
       VITE_CARTO_KEY: ${{ secrets.VITE_CARTO_KEY }}
+      # AI chat backend config. None of these are credentials: the container
+      # gets AWS access from the EC2 instance's IAM role. Repo *variables*
+      # rather than secrets, so they stay visible and reviewable.
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+      BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' }}
+      KNOWLEDGE_BASE_ID: ${{ vars.KNOWLEDGE_BASE_ID }}
+      KB_SEARCH_MODE: ${{ vars.KB_SEARCH_MODE || 'managed' }}
+      KB_NUM_RESULTS: ${{ vars.KB_NUM_RESULTS || '5' }}
+      MAX_TOKENS: ${{ vars.MAX_TOKENS || '2048' }}
 
     steps:
       - name: Warn on missing CARTO key
         # Checked through env because the secrets context is not usable in `if`.
         if: ${{ env.VITE_CARTO_KEY == '' }}
         run: echo "::warning::VITE_CARTO_KEY is not set; the CARTO basemap will use the free/watermarked tier."
+
+      - name: Warn on missing knowledge base
+        if: ${{ env.KNOWLEDGE_BASE_ID == '' }}
+        run: echo "::warning::KNOWLEDGE_BASE_ID is not set; the AI assistant will answer without retrieving from the S3 knowledge base."
 
       - name: Pull
         run: |
@@ -47,31 +60,40 @@ jobs:
           docker compose build --pull
           docker compose up -d --remove-orphans
 
-      - name: Wait for container to become healthy
+      - name: Wait for containers to become healthy
         run: |
           set -euo pipefail
           cd "$DEPLOY_DIR"
-          cid="$(docker compose ps -q web)"
-          if [ -z "$cid" ]; then
-            echo "::error::No container found for the web service."
-            docker compose ps
-            exit 1
-          fi
-          for attempt in $(seq 1 30); do
-            state="$(docker inspect -f '{{.State.Status}}' "$cid")"
-            health="$(docker inspect -f '{{.State.Health.Status}}' "$cid")"
-            echo "attempt ${attempt}: state=${state} health=${health}"
-            if [ "$health" = "healthy" ]; then
-              exit 0
+          # Both services define a HEALTHCHECK. The chat probe deliberately does
+          # not call AWS, so it reflects the service being up rather than
+          # Bedrock being reachable.
+          for service in web chat; do
+            cid="$(docker compose ps -q "$service")"
+            if [ -z "$cid" ]; then
+              echo "::error::No container found for the ${service} service."
+              docker compose ps
+              exit 1
             fi
-            if [ "$state" = "exited" ] || [ "$state" = "dead" ]; then
-              break
+            healthy=""
+            for attempt in $(seq 1 30); do
+              state="$(docker inspect -f '{{.State.Status}}' "$cid")"
+              health="$(docker inspect -f '{{.State.Health.Status}}' "$cid")"
+              echo "${service} attempt ${attempt}: state=${state} health=${health}"
+              if [ "$health" = "healthy" ]; then
+                healthy="yes"
+                break
+              fi
+              if [ "$state" = "exited" ] || [ "$state" = "dead" ]; then
+                break
+              fi
+              sleep 5
+            done
+            if [ -z "$healthy" ]; then
+              echo "::error::${service} did not become healthy."
+              docker compose logs --tail 100 "$service"
+              exit 1
             fi
-            sleep 5
           done
-          echo "::error::Container did not become healthy."
-          docker compose logs --tail 100 web
-          exit 1
 
       - name: Smoke test
         run: |
@@ -86,7 +108,11 @@ jobs:
           # Proves the built bundle is actually in the image, not just that nginx runs.
           curl --fail --silent --show-error --max-time 10 \
             "http://127.0.0.1:${port}/" | grep -q '<div id="app">'
-          echo "Smoke test passed on port ${port}."
+          # Proves the nginx -> chat proxy hop works end to end. This does not
+          # call Bedrock, so it stays green even if AWS access is misconfigured.
+          curl --fail --silent --show-error --max-time 10 \
+            "http://127.0.0.1:${port}/api/health" | grep -q '"status":"ok"'
+          echo "Smoke test passed on port ${port} (static site + /api proxy)."
 
       - name: Prune dangling images
         if: always()

@@ -1,0 +1,12 @@
+# Build context for the chat service is ./backend (see compose.yml).
+__pycache__
+**/__pycache__
+*.pyc
+.venv
+venv
+.env
+.env.*
+!.env.example
+README.md
+Dockerfile
+.dockerignore
