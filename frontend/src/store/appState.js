@@ -4,34 +4,12 @@ import { dataLoadHint } from "../lib/data/fetchCsv.js";
 import {
   transitNodes,
   transitGraph,
-  metroStations,
-  searchableNodes,
-  searchableMetroNodes,
   loadNetworkCore,
   createStationGroups,
   createMetroGroups,
+  nearestNode,
 } from "../lib/network.js";
 import { computeReachability, edgeWait } from "../lib/reachability.js";
-import {
-  leafletMap,
-  initLeaflet,
-  bindStopLayerEvents,
-  renderMetroReference,
-  renderBaseStops,
-  drawOrigin,
-  resetMapResults,
-  nearestNode,
-  focusNodeCollection,
-  animateResult,
-  drawSelectedBusRoute,
-  drawSelectedMetroLine,
-  listReachableBusRoutes,
-  listReachableMetroLines,
-  clearOriginLayer,
-  clearSelectedBusRouteLayer,
-  clearSelectedMetroLineLayer,
-  setLeafletController,
-} from "../lib/leafletMap.js";
 import {
   population3dMap,
   initPopulation3dMap,
@@ -43,43 +21,48 @@ import {
   animateIntegratedResult,
   resetPopulationMapView,
   setMapController,
+  AGE_GROUPS,
+  AGE_GROUP_COLORS,
+  redrawPopulationBars,
 } from "../lib/mapLibreMap.js";
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
+import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
 
 const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—" };
 
-/* [本次改版：原本整個網站只有一個 Vue app 實例，所有分頁共用同一份 data()/methods。
-   拆成多個路由元件後，選站、出發時間、可達結果這些狀態仍要跨「30 分鐘交通」與
-   「整合地圖」共用（在其中一頁選站，切到另一頁要看得到同一個選擇），
-   所以改成一個模組級的 reactive() 單例，取代原本的 appVm，而不是各自元件的 data()。] */
+/* [本次改版：3D人口／30分鐘交通／預算模擬／青年熱區各自的獨立分頁都拿掉了，
+   青年熱區排行、圖例、交通分析三塊改整合進「整合地圖」左側面板，共用同一份
+   reactive() 狀態，取代原本每個分頁各自的 data()。] */
 export const appState = reactive({
   activeView: "home",
   navItems: [
     { id: "home", label: "系統總覽" },
     { id: "combined", label: "整合地圖" },
-    { id: "map3d", label: "3D 人口" },
-    { id: "forecast", label: "青年熱區" },
     { id: "resources", label: "資源缺口" },
-    { id: "transit", label: "30 分鐘交通" },
-    { id: "budget", label: "預算模擬" },
   ],
   navMenuOpen: false,
-  resourceType: "all",
-  gapItems: [
-    { area: "林口區", type: "childcare", name: "托育", gap: "缺口 420 席", label: "HIGH DEMAND", level: "risk", copy: "青年家庭與住宅供給同步增長，建議優先盤點公共托育量能。" },
-    { area: "土城區", type: "school", name: "學校", gap: "缺口 12 班", label: "WATCH", level: "warn", copy: "未來學童數可能接近既有班級容量，需提早規劃彈性教室。" },
-    { area: "新店區", type: "parking", name: "停車", gap: "餘裕 8%", label: "STABLE", level: "", copy: "整體仍有容量，但央北生活圈尖峰需求需獨立觀察。" },
-    { area: "三峽區", type: "childcare", name: "托育", gap: "缺口 260 席", label: "WATCH", level: "warn", copy: "新建住宅帶動家庭人口，建議配置巡迴育兒服務。" },
-    { area: "淡水區", type: "parking", name: "停車", gap: "缺口 680 格", label: "HIGH DEMAND", level: "risk", copy: "住宅人口與觀光尖峰重疊，需拆分平假日情境。" },
-    { area: "板橋區", type: "school", name: "學校", gap: "餘裕 14 班", label: "STABLE", level: "", copy: "整體容量尚可，部分新興生活圈仍需持續監測。" },
-  ],
-  budget: { fixed: 2, popup: 3, mobile: 1, staff: 8 },
+  /* [本次改版：資源缺口頁只保留托育一張圖（學校／停車兩張圖已依需求刪除），
+     rows 是「行政區 -> 稀缺率」的原始資料，圖表只取稀缺率最高的前五名。] */
+  resourceGaps: {
+    /* [本次改版：托育缺口改成用「新北市托嬰機構數量統計.csv」＋20~29歲青年人口
+       實際估算（見 loadResourceGapData / lib/resourceGaps.js），rows 在資料
+       載入完成前先留空，圖表載入狀態見 childcareGapStatus。] */
+    childcare: {
+      label: "托育",
+      unit: "%",
+      metricLabel: "稀缺率",
+      copy: "各行政區公共托育稀缺率（依機構數與20~29歲青年人口推估，公立／私立分開疊圖）",
+      rows: [],
+    },
+  },
   transitLoaded: false,
   transitLoading: false,
   transitStatus: "官方資料待載入",
+  /* [本次新增：托育缺口改成非同步從 CSV 估算，需要自己的載入狀態旗標] */
+  childcareGapLoaded: false,
+  childcareGapLoading: false,
+  childcareGapStatus: "托育缺口資料待載入",
   stopMode: "bus",
-  stopQuery: "",
-  stopSuggestions: [],
   stationGroups: [],
   activeDistrict: "板橋區",
   metroGroups: [],
@@ -90,12 +73,13 @@ export const appState = reactive({
   minuteLimit: 30,
   animationClock: "00:00",
   metrics: { ...EMPTY_METRICS },
-  resultRoutes: [],
-  selectedRouteId: null,
-  selectedRouteInfo: null,
-  resultMetroLines: [],
-  selectedMetroLineId: null,
-  selectedMetroLineInfo: null,
+  /* [本次新增：地圖上的公車／捷運站點圖層可開關，預設開啟] */
+  showTransitStops: true,
+  /* [本次新增：3D 人口柱圖例（年齡層／可及性）選取狀態，取代原本的年份滑桿；
+     ageGroups/colors 是固定常數，直接從地圖模組帶過來給左側面板畫勾選框] */
+  legendAgeGroups: AGE_GROUPS,
+  legendColors: AGE_GROUP_COLORS,
+  selectedAgeGroups: [...AGE_GROUPS],
   chatOpen: false,
   chatInput: "",
   chatChips: ["哪裡最適合設點？", "30 分鐘怎麼算？", "幫我看預算方案"],
@@ -112,9 +96,6 @@ export const appState = reactive({
     const group = this.metroGroups.find(function (item) { return item.id === this.activeMetroLine; }, this);
     return group ? group.stops : [];
   },
-  get searchPlaceholder() {
-    return this.stopMode === "metro" ? "輸入捷運站名，例如：板橋" : "輸入公車站名，例如：板橋車站";
-  },
   get forecastRows() {
     return [
       { name: "林口區", score: 88 },
@@ -124,15 +105,40 @@ export const appState = reactive({
       { name: "淡水區", score: 68 },
     ];
   },
-  get filteredGaps() {
-    if (this.resourceType === "all") return this.gapItems;
-    return this.gapItems.filter(function (item) { return item.type === this.resourceType; }, this);
-  },
-  get annualCost() {
-    return this.budget.fixed * 420 + this.budget.popup * 90 + this.budget.mobile * 260 + this.budget.staff * 72;
-  },
-  get coverageRate() {
-    return Math.min(96, Math.round(72 + this.budget.fixed * 6.5 + this.budget.popup * 2 + this.budget.mobile * 3.5 + this.budget.staff * .4));
+  /* [本次改版：把每一類資料取前五名，並算出長條圖的寬度百分比
+     （相對於該類前五名裡最大的數值）供長條圖渲染；托育這類額外附帶
+     segments（公立／私立），畫成橫向疊圖，學校／停車維持單一色塊。] */
+  get resourceGapCharts() {
+    return Object.keys(this.resourceGaps).map(function (key) {
+      const category = this.resourceGaps[key];
+      const top5 = category.rows.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
+      const maxValue = top5.length ? top5[0].value : 0;
+      return {
+        key: key,
+        label: category.label,
+        unit: category.unit,
+        metricLabel: category.metricLabel,
+        copy: category.copy,
+        rows: top5.map(function (row) {
+          const segments = row.segments
+            ? row.segments.map(function (segment) {
+                return {
+                  key: segment.key,
+                  label: segment.label,
+                  value: segment.value,
+                  widthPercent: maxValue ? Math.round((segment.value / maxValue) * 100) : 0,
+                };
+              })
+            : null;
+          return {
+            area: row.area,
+            value: row.value,
+            widthPercent: maxValue ? Math.round((row.value / maxValue) * 100) : 0,
+            segments: segments,
+          };
+        }),
+      };
+    }, this);
   },
 
   /* ===== methods（原本 Vue methods，行為與呼叫方式不變，只是掛在這個共用單例上） ===== */
@@ -144,14 +150,24 @@ export const appState = reactive({
   resetPopulationMapView() {
     resetPopulationMapView();
   },
+  /* [本次新增：地圖上的交通標點開關，勾選框直接呼叫這個方法] */
+  toggleTransitStops(visible) {
+    this.showTransitStops = visible;
+    setIntegratedTransitVisibility(visible);
+  },
+  /* [本次新增：圖例勾選框呼叫這個方法，取代原本切換年份重繪] */
+  toggleAgeGroup(age, visible) {
+    const index = this.selectedAgeGroups.indexOf(age);
+    if (!visible) {
+      if (this.selectedAgeGroups.length === 1) return; // 至少保留一項，跟原本圖例邏輯一致
+      if (index >= 0) this.selectedAgeGroups.splice(index, 1);
+    } else if (index < 0) {
+      this.selectedAgeGroups.push(age);
+    }
+    redrawPopulationBars(this.selectedAgeGroups);
+  },
   async loadTransit() {
     if (this.transitLoaded) {
-      if (leafletMap && this.activeView === "transit") {
-        bindStopLayerEvents();
-        renderMetroReference();
-        renderBaseStops();
-        if (this.selectedStartId) drawOrigin(transitNodes.get(this.selectedStartId));
-      }
       ensureIntegratedTransitLayers();
       return;
     }
@@ -165,43 +181,36 @@ export const appState = reactive({
       if (!this.metroGroups.some(function (group) { return group.id === this.activeMetroLine; }, this) && this.metroGroups[0]) {
         this.activeMetroLine = this.metroGroups[0].id;
       }
-      if (leafletMap && this.activeView === "transit") {
-        bindStopLayerEvents();
-        renderMetroReference();
-        renderBaseStops();
-      }
       ensureIntegratedTransitLayers();
       const defaultNode = nearestNode(25.0142, 121.4639).node;
       if (defaultNode && !this.selectedStartId) this.chooseStop(defaultNode.id, false);
       this.transitLoaded = true;
-      this.transitStatus = "公車 " + searchableNodes.length.toLocaleString() + " 站・捷運 " + metroStations.length + " 站";
     } catch (error) {
       console.error(error);
       this.transitStatus = "資料載入失敗。" + dataLoadHint();
     } finally {
       this.transitLoading = false;
       await nextTick();
-      if (leafletMap && this.activeView === "transit") leafletMap.invalidateSize();
-      if (population3dMap && this.activeView === "combined") population3dMap.resize();
+      if (population3dMap) population3dMap.resize();
     }
   },
-  findStops() {
-    const query = this.stopQuery.trim().toLowerCase();
-    if (!query || !this.transitLoaded) {
-      this.stopSuggestions = [];
-      return;
+  /* [本次新增：托育缺口改成非同步估算，載入完成後直接覆蓋 resourceGaps.childcare.rows，
+     resourceGapCharts 這個 getter 不用改，一樣會取前五名重新排序] */
+  async loadResourceGapData() {
+    if (this.childcareGapLoaded || this.childcareGapLoading) return;
+    this.childcareGapLoading = true;
+    this.childcareGapStatus = "讀取托嬰機構與青年人口資料…";
+    try {
+      const rows = await estimateChildcareGapRows();
+      this.resourceGaps.childcare.rows = rows;
+      this.childcareGapLoaded = true;
+      this.childcareGapStatus = "";
+    } catch (error) {
+      console.error(error);
+      this.childcareGapStatus = "資料載入失敗。" + dataLoadHint();
+    } finally {
+      this.childcareGapLoading = false;
     }
-    const source = this.stopMode === "metro" ? searchableMetroNodes : searchableNodes;
-    this.stopSuggestions = source.filter(function (node) {
-      return node.name.toLowerCase().includes(query);
-    }).slice(0, 8).map(function (node) {
-      return {
-        id: node.id,
-        name: node.name,
-        routeCount: node.routes.size,
-        kindLabel: node.mode === "metro" ? "捷運站" : "公車站",
-      };
-    });
   },
   chooseStop(nodeId, moveMap) {
     const node = transitNodes.get(nodeId);
@@ -213,63 +222,33 @@ export const appState = reactive({
       this.activeDistrict = node.district;
     }
     this.selectedStartId = nodeId;
-    this.stopQuery = node.name;
-    this.stopSuggestions = [];
     this.metrics = { ...EMPTY_METRICS };
-    this.resultRoutes = [];
-    this.resultMetroLines = [];
-    resetMapResults();
     clearIntegratedResults(false);
-    if (leafletMap && this.activeView === "transit") {
-      drawOrigin(node);
-      if (moveMap !== false) leafletMap.flyTo([node.lat, node.lon], Math.max(leafletMap.getZoom(), 13), { duration: .65 });
-    }
-    if (population3dMap && this.activeView === "combined") drawIntegratedOrigin(node, moveMap);
+    drawIntegratedOrigin(node, moveMap);
   },
   selectDistrict(district) {
     this.stopMode = "bus";
     this.activeDistrict = district;
     this.selectedStartId = null;
-    this.stopQuery = "";
-    this.stopSuggestions = [];
     this.metrics = { ...EMPTY_METRICS };
-    this.resultRoutes = [];
-    this.resultMetroLines = [];
-    resetMapResults();
     clearIntegratedResults();
-    clearOriginLayer();
-    if (this.activeView === "combined") focusIntegratedNodes(this.activeDistrictStops, 13);
-    else focusNodeCollection(this.activeDistrictStops, 13);
+    focusIntegratedNodes(this.activeDistrictStops, 13);
   },
   selectMetroLine(lineId) {
     this.stopMode = "metro";
     this.activeMetroLine = lineId;
     this.selectedStartId = null;
-    this.stopQuery = "";
-    this.stopSuggestions = [];
     this.metrics = { ...EMPTY_METRICS };
-    this.resultRoutes = [];
-    this.resultMetroLines = [];
-    resetMapResults();
     clearIntegratedResults();
-    clearOriginLayer();
-    if (this.activeView === "combined") focusIntegratedNodes(this.activeMetroStops, 13);
-    else focusNodeCollection(this.activeMetroStops, 13);
+    focusIntegratedNodes(this.activeMetroStops, 13);
   },
   selectStopMode(mode) {
     this.stopMode = mode;
     this.selectedStartId = null;
-    this.stopQuery = "";
-    this.stopSuggestions = [];
     this.metrics = { ...EMPTY_METRICS };
-    this.resultRoutes = [];
-    this.resultMetroLines = [];
-    resetMapResults();
     clearIntegratedResults();
-    clearOriginLayer();
     const stops = mode === "metro" ? this.activeMetroStops : this.activeDistrictStops;
-    if (this.activeView === "combined") focusIntegratedNodes(stops, 13);
-    else focusNodeCollection(stops, 13);
+    focusIntegratedNodes(stops, 13);
   },
   runReachability() {
     if (!this.selectedStartId) return;
@@ -285,30 +264,7 @@ export const appState = reactive({
       distance: result.farthestKm.toFixed(1) + " km",
       wait: minWait.toFixed(1) + " 分",
     };
-    this.resultRoutes = listReachableBusRoutes(result.busRouteIds);
-    this.resultMetroLines = listReachableMetroLines(result.metroLineIds);
-    if (this.activeView === "combined") animateIntegratedResult(result);
-    else animateResult(result);
-  },
-  focusBusRoute(routeId) {
-    this.clearMetroLine();
-    this.selectedRouteId = routeId;
-    this.selectedRouteInfo = drawSelectedBusRoute(routeId);
-  },
-  clearBusRoute() {
-    this.selectedRouteId = null;
-    this.selectedRouteInfo = null;
-    clearSelectedBusRouteLayer();
-  },
-  focusMetroLine(lineId) {
-    this.clearBusRoute();
-    this.selectedMetroLineId = lineId;
-    this.selectedMetroLineInfo = drawSelectedMetroLine(lineId);
-  },
-  clearMetroLine() {
-    this.selectedMetroLineId = null;
-    this.selectedMetroLineInfo = null;
-    clearSelectedMetroLineLayer();
+    animateIntegratedResult(result);
   },
   localChatReply(text) {
     return localChatReply(text);
@@ -336,30 +292,20 @@ export const appState = reactive({
   },
 });
 
-
 /* [本次改版：把地圖模組會回呼的 controller 指向這個共用單例，取代原本的全域 appVm，
    只需要在應用程式啟動時設定一次] */
-setLeafletController(appState);
 setMapController(appState);
 
-/* [本次改版：原本 go()／mounted()／hashchange 監聽各自寫一套「依畫面初始化地圖」的邏輯，
-   容易兩邊順序兜不起來；統一成這一個函式，由 router 的 afterEach 呼叫，
-   不管是點選單、瀏覽器上一頁/下一頁、還是直接輸入網址都會走同一條路徑。] */
+/* [本次改版：3D人口／30分鐘交通／預算模擬／青年熱區都刪掉了，整合地圖是唯一
+   需要初始化地圖／交通資料的畫面，其餘畫面不需要任何動作。] */
 export async function ensureViewReady(view) {
   await nextTick();
-  if (view === "transit") {
-    initLeaflet();
-    leafletMap && leafletMap.invalidateSize();
-    await appState.loadTransit();
-  } else if (view === "combined") {
+  if (view === "combined") {
     initPopulation3dMap();
     await appState.loadTransit();
     ensureIntegratedTransitLayers();
-    setIntegratedTransitVisibility(true);
-  } else if (view === "map3d") {
-    initPopulation3dMap();
-    setIntegratedTransitVisibility(false);
-  } else {
-    setIntegratedTransitVisibility(false);
+    setIntegratedTransitVisibility(appState.showTransitStops);
+  } else if (view === "resources") {
+    await appState.loadResourceGapData();
   }
 }

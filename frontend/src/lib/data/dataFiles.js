@@ -21,4 +21,6 @@ export const DATA_FILES = {
   populationDistricts: "data/3d_map/新北市行政區.csv",
   populationDistrictLocations: "data/3d_map/新北市行政區經緯度.csv",
   populationYouthCounts: "data/3d_map/新北市20至34歲人數.csv",
+  /* [本次新增：托育機構數量統計，用來跟青年人口交叉估算托育資源缺口] */
+  childcareInstitutions: "data/raw/新北市托嬰機構數量統計.csv",
 };

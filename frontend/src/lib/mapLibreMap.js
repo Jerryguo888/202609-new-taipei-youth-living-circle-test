@@ -13,8 +13,8 @@ import { ensureTransitReachCache, buildDistrictTransitScores } from "./reachabil
 
 /* [本次移植：原本直接呼叫全域 appVm 的地方，改成呼叫由外部（appState store）
    註冊進來的 controller，避免這個模組要反過來 import store 造成循環依賴。
-   controller 需要提供：activeView、selectedStartId、chooseStop(id, moveMap)、
-   animationSpeed、animationClock。] */
+   controller 需要提供：selectedStartId、chooseStop(id, moveMap)、
+   animationSpeed、animationClock、showTransitStops。] */
 let controller = null;
 export function setMapController(nextController) {
   controller = nextController;
@@ -26,6 +26,16 @@ export let population3dBaseReady = false;
 export let population3dBounds = null;
 let integratedTransitReady = false;
 let popByYearRef = {};
+
+/* [本次改版：拿掉年份滑桿，圖例的年齡層／可及性選取狀態改由這裡集中管理，
+   供 Vue 左側面板讀取／勾選；顏色與標籤是固定常數，地圖畫好後才會有 redrawBars] */
+export const AGE_GROUPS = ["20~29歲", "30~34歲", "交通可及性"];
+export const AGE_GROUP_COLORS = ["#24d7ff", "#ff4f9a", "#ffd447"];
+let redrawBars = null;
+
+export function redrawPopulationBars(selectedAges) {
+  if (redrawBars) redrawBars(selectedAges);
+}
 
 /* [2026-09-11 新增：整合頁交通圖層清單；切回原 3D 分頁時只隱藏，不更動組員資料] */
 const INTEGRATED_TRANSIT_LAYER_IDS = [
@@ -117,7 +127,7 @@ export function ensureIntegratedTransitLayers() {
   ].join("|");
   if (!population3dMap || !population3dBaseReady || !transitNodes.size) return;
   if (integratedTransitReady) {
-    setIntegratedTransitVisibility(controller && controller.activeView === "combined");
+    setIntegratedTransitVisibility(controller ? controller.showTransitStops : true);
     return;
   }
 
@@ -261,7 +271,7 @@ export function ensureIntegratedTransitLayers() {
   integratedTransitReady = true;
   const mapElement = document.getElementById("population-3d-map");
   if (mapElement) mapElement.dataset.transitLayerCount = String(INTEGRATED_TRANSIT_LAYER_IDS.length);
-  setIntegratedTransitVisibility(controller && controller.activeView === "combined");
+  setIntegratedTransitVisibility(controller ? controller.showTransitStops : true);
   if (controller && controller.selectedStartId) drawIntegratedOrigin(transitNodes.get(controller.selectedStartId), false);
 
   population3dMap.on("click", "integrated-bus-cluster-hit", function (event) {
@@ -418,13 +428,16 @@ export function resetPopulationMapView() {
 }
 
 /* ===== [本次移植：組員 3D 人口地圖核心開始] =====
-   複製原 3d_map 的資料交叉比對、立體堆疊、年份滑桿與圖例互動；
-   來源檔案保持唯讀，僅將容器與控制項改成目前網站的視覺樣式。 */
+   複製原 3d_map 的資料交叉比對與立體堆疊；來源檔案保持唯讀，僅將容器與
+   控制項改成目前網站的視覺樣式。
+   [本次改版：拿掉年份滑桿，固定用最新一年的資料；圖例改由 Vue 左側面板
+   渲染，這裡只保留「計算選取狀態→重繪柱狀圖」的邏輯，透過 redrawBars
+   讓外部的 redrawPopulationBars() 呼叫。] */
 export async function initPopulation3dMap() {
   if (population3dMap) {
     setTimeout(function () {
       population3dMap.resize();
-      setIntegratedTransitVisibility(controller && controller.activeView === "combined");
+      setIntegratedTransitVisibility(controller ? controller.showTransitStops : true);
     }, 0);
     return;
   }
@@ -432,10 +445,8 @@ export async function initPopulation3dMap() {
   population3dLoading = true;
 
   const status = document.getElementById("population-3d-status");
-  const legend = document.getElementById("population-3d-legend");
-  const yearPanel = document.getElementById("population-3d-year-panel");
   const tooltip = document.getElementById("population-3d-tooltip");
-  if (!status || !legend || !yearPanel || !tooltip) {
+  if (!status || !tooltip) {
     population3dLoading = false;
     return;
   }
@@ -474,22 +485,18 @@ export async function initPopulation3dMap() {
     popByYearRef = popByYear;
     const years = Object.keys(popByYear).sort(function (a, b) { return Number(a) - Number(b); });
     if (!years.length) throw new Error("CSV 交叉比對後沒有可顯示資料");
+    /* 拿掉年份滑桿後固定顯示最新一年的資料 */
+    const currentYear = years[years.length - 1];
 
-    const ageGroups = ["20~29歲", "30~34歲", "交通可及性"];
-    /* [2026-09-11 修正：底圖維持黑灰，但人口／可及性柱恢復鮮豔高對比色] */
-    const colors = ["#24d7ff", "#ff4f9a", "#ffd447"];
-    const selectedAges = new Set(ageGroups);
+    const selectedAges = new Set(AGE_GROUPS);
     let maxTotal = 0;
-    years.forEach(function (year) {
-      popByYear[year].forEach(function (row) { maxTotal = Math.max(maxTotal, row.a1 + row.a2); });
-    });
+    popByYear[currentYear].forEach(function (row) { maxTotal = Math.max(maxTotal, row.a1 + row.a2); });
     const scale = 5000 / maxTotal;
     const half = .004;
-    let currentYear = years[0];
     /* [本次新增：交通可及性分數換算高度用的獨立比例尺，等交通資料算完才會有值；
        算好前這根柱子不會出現，算好後會重新繪製] */
     let transitScale = 0;
-    let transitScoresByYear = null;
+    let transitScores = null;
     /* [本次改版：交通可及性是「比率 × 人口」的複合分數，跟人口柱的「人數」單位不同，
        改成畫在人口柱右側的獨立柱子，不再疊加，避免總高度混合兩種不同單位] */
     const transitHalf = half;
@@ -505,12 +512,11 @@ export async function initPopulation3dMap() {
       ]];
     }
 
-    function buildBarFeatures(year) {
+    function buildBarFeatures() {
       const features = [];
-      const transitScores = transitScoresByYear ? transitScoresByYear.get(year) : null;
-      popByYear[year].forEach(function (row) {
+      popByYear[currentYear].forEach(function (row) {
         let heightSoFar = 0;
-        [[ageGroups[0], row.a1, row.a1 * scale], [ageGroups[1], row.a2, row.a2 * scale]].forEach(function (entry, index) {
+        [[AGE_GROUPS[0], row.a1, row.a1 * scale], [AGE_GROUPS[1], row.a2, row.a2 * scale]].forEach(function (entry, index) {
           const label = entry[0], rawValue = entry[1], height = entry[2];
           if (!selectedAges.has(label)) return;
           const base = heightSoFar;
@@ -523,23 +529,23 @@ export async function initPopulation3dMap() {
               value: rawValue,
               base: base,
               top: heightSoFar,
-              color: colors[index],
+              color: AGE_GROUP_COLORS[index],
             },
             geometry: { type: "Polygon", coordinates: squareRing(row.lon, row.lat, half) },
           });
         });
 
-        if (transitScores && selectedAges.has(ageGroups[2])) {
+        if (transitScores && selectedAges.has(AGE_GROUPS[2])) {
           const rawScore = transitScores.get(row.area) || 0;
           features.push({
             type: "Feature",
             properties: {
               district: row.area,
-              age: ageGroups[2],
+              age: AGE_GROUPS[2],
               value: Math.round(rawScore),
               base: 0,
               top: rawScore * transitScale,
-              color: colors[2],
+              color: AGE_GROUP_COLORS[2],
             },
             geometry: { type: "Polygon", coordinates: squareRing(row.lon + transitOffsetLon, row.lat, transitHalf) },
           });
@@ -548,10 +554,10 @@ export async function initPopulation3dMap() {
       return { type: "FeatureCollection", features: features };
     }
 
-    function buildLabelFeatures(year) {
+    function buildLabelFeatures() {
       return {
         type: "FeatureCollection",
-        features: popByYear[year].map(function (row) {
+        features: popByYear[currentYear].map(function (row) {
           return {
             type: "Feature",
             properties: { name: row.area },
@@ -601,23 +607,22 @@ export async function initPopulation3dMap() {
     });
     population3dMap.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
 
-    function setYear(year) {
-      currentYear = year;
-      /* [本次修正：setYear 也會被「載入完成後」的非同步流程呼叫；
-         這時使用者可能已經切到別的路由，population-3d-map 那組 DOM 已經卸載，
-         getElementById 拿到 null，直接寫 textContent 會整個炸掉，所以要判斷存在。] */
-      const label = document.getElementById("population-3d-year-label");
-      if (label) label.textContent = year;
+    function redraw() {
       const source = population3dMap.getSource("pop-bars");
-      if (source) source.setData(buildBarFeatures(year));
+      if (source) source.setData(buildBarFeatures());
     }
+
+    /* [本次改版：讓 Vue 左側面板的圖例勾選能觸發重繪，取代原本的年份切換] */
+    redrawBars = function (nextSelectedAges) {
+      selectedAges.clear();
+      (nextSelectedAges || []).forEach(function (age) { selectedAges.add(age); });
+      redraw();
+    };
 
     population3dMap.on("load", function () {
       population3dBaseReady = true;
       status.hidden = true;
-      legend.hidden = false;
-      yearPanel.hidden = false;
-      population3dMap.addSource("pop-bars", { type: "geojson", data: buildBarFeatures(currentYear) });
+      population3dMap.addSource("pop-bars", { type: "geojson", data: buildBarFeatures() });
       population3dMap.addLayer({
         id: "pop-bars-layer",
         type: "fill-extrusion",
@@ -629,7 +634,7 @@ export async function initPopulation3dMap() {
           "fill-extrusion-opacity": .9,
         },
       });
-      population3dMap.addSource("district-labels", { type: "geojson", data: buildLabelFeatures(currentYear) });
+      population3dMap.addSource("district-labels", { type: "geojson", data: buildLabelFeatures() });
       population3dMap.addLayer({
         id: "district-label-layer",
         type: "symbol",
@@ -654,11 +659,11 @@ export async function initPopulation3dMap() {
       population3dMap.setPitch(55);
       population3dMap.setBearing(-10);
 
-      /* [2026-09-11 新增：若交通網路已完成，立刻疊到這張 3D 圖；獨立人口頁會自動隱藏] */
+      /* [2026-09-11 新增：若交通網路已完成，立刻疊到這張 3D 圖] */
       ensureIntegratedTransitLayers();
 
       /* [本次新增：每站 30 分鐘可達站數 ÷ 行政區站數 × 行政區青年人口，
-         平均到行政區後疊加為柱狀圖第三段，直接堆在 20~29 歲、30~34 歲上面] */
+         疊加為柱狀圖第三段，直接堆在 20~29 歲、30~34 歲上面] */
       loadNetworkCore().then(function () {
         ensureIntegratedTransitLayers();
         status.hidden = false;
@@ -668,15 +673,12 @@ export async function initPopulation3dMap() {
           status.textContent = "計算交通節點可及性中…" + done.toLocaleString() + " / " + total.toLocaleString();
         }, controller ? controller.departureTime : "08:00");
       }).then(function () {
-        transitScoresByYear = new Map();
-        years.forEach(function (year) { transitScoresByYear.set(year, buildDistrictTransitScores(year, popByYearRef)); });
+        transitScores = buildDistrictTransitScores(currentYear, popByYearRef);
         let maxTransitScore = 0;
-        transitScoresByYear.forEach(function (scores) {
-          scores.forEach(function (score) { maxTransitScore = Math.max(maxTransitScore, score); });
-        });
+        transitScores.forEach(function (score) { maxTransitScore = Math.max(maxTransitScore, score); });
         transitScale = maxTransitScore > 0 ? 5000 / maxTransitScore : 0;
         status.hidden = true;
-        setYear(currentYear);
+        redraw();
       }).catch(function (error) {
         console.error(error);
         status.hidden = false;
@@ -684,12 +686,6 @@ export async function initPopulation3dMap() {
         status.textContent = "交通節點可及性計算失敗：" + error.message + "。" + dataLoadHint();
       });
     });
-
-    const slider = document.getElementById("population-3d-year-slider");
-    slider.max = years.length - 1;
-    slider.value = 0;
-    document.getElementById("population-3d-year-label").textContent = currentYear;
-    slider.addEventListener("input", function () { setYear(years[Number(slider.value)]); });
 
     population3dMap.on("mousemove", "pop-bars-layer", function (event) {
       population3dMap.getCanvas().style.cursor = "pointer";
@@ -704,31 +700,6 @@ export async function initPopulation3dMap() {
     population3dMap.on("mouseleave", "pop-bars-layer", function () {
       population3dMap.getCanvas().style.cursor = "";
       tooltip.style.display = "none";
-    });
-
-    const legendRows = document.getElementById("population-3d-legend-rows");
-    legendRows.replaceChildren();
-    ageGroups.forEach(function (age, index) {
-      const row = document.createElement("label");
-      row.className = "legend-row";
-      row.innerHTML = "<input type=\"checkbox\" class=\"legend-checkbox\" checked>" +
-        "<span class=\"swatch\" style=\"background:" + colors[index] + "\"></span>" + age;
-      const checkbox = row.querySelector("input");
-      checkbox.addEventListener("change", function () {
-        if (!checkbox.checked) {
-          if (selectedAges.size === 1) {
-            checkbox.checked = true;
-            return;
-          }
-          selectedAges.delete(age);
-          row.classList.add("off");
-        } else {
-          selectedAges.add(age);
-          row.classList.remove("off");
-        }
-        setYear(currentYear);
-      });
-      legendRows.appendChild(row);
     });
   } catch (error) {
     console.error(error);
