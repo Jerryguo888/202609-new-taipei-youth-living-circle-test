@@ -1,5 +1,13 @@
 import { DATA_FILES } from "./data/dataFiles.js";
 
+/* [Jerry 修正：固定補齊新北29區，沒有零車站點的行政區也必須顯示 0 站。] */
+const NEW_TAIPEI_DISTRICTS = [
+  "板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "鶯歌區", "三峽區",
+  "淡水區", "汐止區", "瑞芳區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區",
+  "石碇區", "坪林區", "三芝區", "石門區", "八里區", "平溪區", "雙溪區", "貢寮區", "金山區",
+  "萬里區", "烏來區",
+];
+
 /* ===== [Jerry 新增：YouBike 公共資源統計開始] =====
    預設讀取 repo 內的新北市政府官方資料快照，確保 GitHub Pages 在 HTTPS 下可用。
    比賽部署 AWS 後，只要設定 VITE_YOUBIKE_API_URL，即可改讀相同欄位格式的即時 API；
@@ -44,11 +52,14 @@ function summarize(stations, payloadUpdatedAt, isSnapshot) {
     }
   });
 
-  /* [Jerry 修正：放大內容是「行政區排行」，不是逐站地址清單。] */
-  const allZeroDistricts = Array.from(zeroByDistrict, function ([district, count]) {
-    return { district, count };
+  /* [Jerry 修正：放大內容是完整29區排行，不省略 count=0 的行政區。] */
+  const districtOrder = new Map(NEW_TAIPEI_DISTRICTS.map(function (district, index) {
+    return [district, index];
+  }));
+  const allZeroDistricts = NEW_TAIPEI_DISTRICTS.map(function (district) {
+    return { district, count: zeroByDistrict.get(district) || 0 };
   }).sort(function (a, b) {
-    return b.count - a.count || a.district.localeCompare(b.district, "zh-Hant");
+    return b.count - a.count || districtOrder.get(a.district) - districtOrder.get(b.district);
   });
   const maxZeroCount = allZeroDistricts.length ? allZeroDistricts[0].count : 0;
   const rankedZeroDistricts = allZeroDistricts.map(function (row) {

@@ -29,7 +29,6 @@ const youbikeStats = computed(function () {
 
 /* ===== [Jerry 修正：零車「行政區排行」放大面板開始] ===== */
 const zeroDistrictPanelOpen = ref(false);
-const zeroDistrictPanelExpanded = ref(false);
 const zeroDistrictPanel = ref(null);
 const zeroDistrictTrigger = ref(null);
 
@@ -43,7 +42,6 @@ async function openZeroDistrictPanel() {
 
 function closeZeroDistrictPanel() {
   zeroDistrictPanelOpen.value = false;
-  zeroDistrictPanelExpanded.value = false;
   document.body.classList.remove("has-youbike-zero-panel");
   nextTick(function () {
     zeroDistrictTrigger.value?.focus();
@@ -161,33 +159,31 @@ onBeforeUnmount(function () {
       </section>
       <!-- ===== [Jerry 新增：YouBike 公共資源面板結束] ===== -->
 
-      <!-- ===== [Jerry 修正：行政區零車站排行右側可放大面板開始] ===== -->
+      <!-- ===== [Jerry 修正：行政區零車站排行中央放大視窗開始] ===== -->
       <Teleport to="body">
         <Transition name="youbike-panel">
           <div v-if="zeroDistrictPanelOpen" class="youbike-zero-backdrop" @click.self="closeZeroDistrictPanel">
             <aside ref="zeroDistrictPanel" tabindex="-1" role="dialog" aria-modal="true"
                    aria-labelledby="zero-district-panel-title" class="youbike-zero-panel"
-                   :class="{ 'is-expanded': zeroDistrictPanelExpanded }" @keydown.esc="closeZeroDistrictPanel">
+                   @keydown.esc="closeZeroDistrictPanel">
               <header class="youbike-zero-panel-head">
                 <div>
                   <p>新北 YouBike 行政區統計</p>
                   <h2 id="zero-district-panel-title">無車可借場站排行</h2>
                 </div>
                 <div class="youbike-zero-panel-actions">
-                  <button type="button" @click="zeroDistrictPanelExpanded = !zeroDistrictPanelExpanded">
-                    {{ zeroDistrictPanelExpanded ? "縮小" : "放大" }}
-                  </button>
                   <button type="button" class="is-close" aria-label="關閉無車可借行政區排行" @click="closeZeroDistrictPanel">關閉</button>
                 </div>
               </header>
 
               <div class="youbike-zero-panel-tools">
-                <strong>0 台可借場站最多的行政區</strong>
-                <p>共 {{ youbikeData.allZeroDistricts.length }} 區、{{ youbikeData.zeroBikeStations.toLocaleString("zh-TW") }} 個場站</p>
+                <strong>0 台可借場站的完整行政區排行</strong>
+                <p>共 29 區、{{ youbikeData.zeroBikeStations.toLocaleString("zh-TW") }} 個無車可借場站；沒有發生的行政區仍列為 0 站</p>
               </div>
 
               <ol class="youbike-zero-district-list">
-                <li v-for="(row, index) in youbikeData.allZeroDistricts" :key="row.district">
+                <li v-for="(row, index) in youbikeData.allZeroDistricts" :key="row.district"
+                    :class="{ 'is-zero': row.count === 0 }">
                   <span class="youbike-zero-district-rank">{{ String(index + 1).padStart(2, "0") }}</span>
                   <strong>{{ row.district }}</strong>
                   <span class="youbike-zero-district-track" aria-hidden="true">
@@ -200,7 +196,7 @@ onBeforeUnmount(function () {
           </div>
         </Transition>
       </Teleport>
-      <!-- ===== [Jerry 修正：行政區零車站排行右側可放大面板結束] ===== -->
+      <!-- ===== [Jerry 修正：行政區零車站排行中央放大視窗結束] ===== -->
 
       <div class="toolbar">
         <span><strong>生活圈稀缺率 Top 5</strong></span>

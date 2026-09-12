@@ -590,9 +590,8 @@
       to { background-position: -220% 0; }
     }
 
-    /* ===== [Jerry 修正：無車可借行政區排行右側清單開始] =====
-       預設保持窄版貼齊右側；使用者按「放大」才擴成寬版。排行本身獨立捲動，
-       外框只用 1px，避免面板看起來太厚重。 */
+    /* ===== [Jerry 修正：無車可借行政區排行置中放大視窗開始] =====
+       點擊後直接在畫面中央顯示完整大視窗，不保留放大／縮小切換；排行獨立捲動。 */
     body.has-youbike-zero-panel { overflow: hidden; }
 
     .youbike-zero-backdrop {
@@ -600,30 +599,28 @@
       inset: 0;
       z-index: 3200;
       display: flex;
-      justify-content: flex-end;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
       background: rgba(3, 7, 9, .56);
       backdrop-filter: blur(3px);
     }
 
     .youbike-zero-panel {
       display: flex;
-      width: min(410px, calc(100vw - 12px));
-      height: calc(100dvh - 20px);
+      width: min(900px, calc(100vw - 36px));
+      height: min(820px, calc(100dvh - 36px));
       min-height: 0;
-      margin: 10px 0 10px auto;
+      margin: 0;
       overflow: hidden;
       flex-direction: column;
       border: 1px solid rgba(255,255,255,.13);
-      border-right: 0;
-      border-radius: 22px 0 0 22px;
+      border-radius: 24px;
       outline: 0;
       background: #11161b;
       color: #f4f7f5;
-      box-shadow: -20px 0 60px rgba(0,0,0,.38);
-      transition: width .24s ease;
+      box-shadow: 0 26px 90px rgba(0,0,0,.48);
     }
-
-    .youbike-zero-panel.is-expanded { width: min(760px, calc(100vw - 12px)); }
 
     .youbike-zero-panel-head {
       display: flex;
@@ -726,10 +723,13 @@
     .youbike-zero-district-track i {
       display: block;
       height: 100%;
-      min-width: 3px;
       border-radius: inherit;
       background: linear-gradient(90deg, #55e6cf, #f4bf22);
     }
+
+    .youbike-zero-district-list li.is-zero { background: #151a1e; }
+    .youbike-zero-district-list li.is-zero > strong,
+    .youbike-zero-district-list li.is-zero > b { color: #87958f; }
 
     .youbike-zero-district-list li > b {
       color: #f4f7f5;
@@ -743,12 +743,12 @@
     .youbike-panel-enter-active,
     .youbike-panel-leave-active { transition: opacity .2s ease; }
     .youbike-panel-enter-active .youbike-zero-panel,
-    .youbike-panel-leave-active .youbike-zero-panel { transition: transform .22s ease, width .24s ease; }
+    .youbike-panel-leave-active .youbike-zero-panel { transition: transform .22s ease, opacity .2s ease; }
     .youbike-panel-enter-from,
     .youbike-panel-leave-to { opacity: 0; }
     .youbike-panel-enter-from .youbike-zero-panel,
-    .youbike-panel-leave-to .youbike-zero-panel { transform: translateX(100%); }
-    /* ===== [Jerry 修正：無車可借行政區排行右側清單結束] ===== */
+    .youbike-panel-leave-to .youbike-zero-panel { opacity: 0; transform: translateY(18px) scale(.97); }
+    /* ===== [Jerry 修正：無車可借行政區排行置中放大視窗結束] ===== */
     /* ===== [Jerry 新增：YouBike 公共資源面板結束] ===== */
 
     /* ===== [本次改版：資源缺口頁只剩托育一張稀缺率疊圖（學校／停車已刪除），
@@ -1463,8 +1463,8 @@
       .youbike-ranking-card { margin-top: 9px; padding: 18px 14px; border-radius: 19px; }
       .youbike-ranking-head { align-items: flex-start; flex-direction: column; gap: 9px; }
       .youbike-ranking-list li { grid-template-columns: 22px 54px minmax(60px, 1fr) 48px; gap: 7px; }
-      .youbike-zero-panel { width: calc(100vw - 8px); height: calc(100dvh - 8px); margin: 4px 0 4px auto; border-radius: 18px 0 0 18px; }
-      .youbike-zero-panel.is-expanded { width: calc(100vw - 8px); }
+      .youbike-zero-backdrop { padding: 6px; }
+      .youbike-zero-panel { width: calc(100vw - 12px); height: calc(100dvh - 12px); margin: 0; border-radius: 18px; }
       .youbike-zero-panel-head { padding: 16px 12px 13px; }
       .youbike-zero-panel-head h2 { font-size: 1.05rem; }
       .youbike-zero-panel-tools { padding: 12px; }
