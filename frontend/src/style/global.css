@@ -1339,37 +1339,37 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 24px;
-      min-height: 92px;
-      padding: 18px clamp(22px, 4vw, 64px);
+      gap: 18px;
+      min-height: 76px;
+      padding: 12px clamp(18px, 2.4vw, 34px);
       color: white;
       background: #123f2b;
       box-shadow: 0 10px 36px rgba(9, 43, 29, .18);
     }
 
-    .chat-title-group { display: flex; align-items: center; gap: 15px; min-width: 0; }
+    .chat-title-group { display: flex; align-items: center; gap: 12px; min-width: 0; }
 
     .chat-mark {
       display: grid;
-      width: 48px;
-      height: 48px;
+      width: 42px;
+      height: 42px;
       flex: 0 0 auto;
       place-items: center;
       border: 1px solid rgba(255,255,255,.24);
-      border-radius: 15px;
+      border-radius: 13px;
       background: rgba(255,255,255,.1);
       font-size: .92rem;
       font-weight: 900;
       letter-spacing: .04em;
     }
 
-    .chat-header strong { display: block; font-size: clamp(1.35rem, 2vw, 1.85rem); letter-spacing: -.035em; }
-    .chat-header .chat-title-group span:last-child { display: block; margin-top: 4px; font-size: .88rem; opacity: .72; }
+    .chat-header strong { display: block; font-size: clamp(1.18rem, 1.55vw, 1.48rem); letter-spacing: -.03em; }
+    .chat-header .chat-title-group span:last-child { display: block; margin-top: 2px; font-size: .78rem; opacity: .72; }
 
     .chat-close {
       display: flex;
-      min-height: 48px;
-      padding: 0 12px 0 18px;
+      min-height: 42px;
+      padding: 0 9px 0 14px;
       align-items: center;
       gap: 10px;
       border: 1px solid rgba(255,255,255,.2);
@@ -1393,9 +1393,9 @@
       min-height: 0;
       margin: 0;
       flex-direction: column;
-      gap: 22px;
+      gap: 14px;
       overflow-y: auto;
-      padding: clamp(28px, 5vh, 56px) clamp(18px, 2.2vw, 34px);
+      padding: clamp(18px, 2.8vh, 28px) clamp(16px, 2vw, 28px);
       scroll-behavior: smooth;
       scrollbar-width: thin;
       scrollbar-color: rgba(28,95,56,.3) transparent;
@@ -1404,11 +1404,11 @@
     .message {
       align-self: flex-start;
       width: fit-content;
-      max-width: min(72%, 760px);
+      max-width: min(78%, 860px);
       margin-right: auto;
-      padding: 17px 20px 18px;
+      padding: 11px 15px 12px;
       border: 1px solid rgba(24,87,47,.1);
-      border-radius: 23px 23px 23px 7px;
+      border-radius: 18px 18px 18px 6px;
       background: rgba(255,255,255,.92);
       color: var(--ink);
       box-shadow: 0 12px 34px rgba(31,65,59,.08);
@@ -1416,17 +1416,17 @@
 
     .message small {
       display: block;
-      margin-bottom: 7px;
+      margin-bottom: 4px;
       color: #63766e;
-      font-size: .82rem;
+      font-size: .76rem;
       font-weight: 800;
       letter-spacing: .035em;
     }
 
     .message p {
       margin: 0;
-      font-size: clamp(1.02rem, 1.35vw, 1.18rem);
-      line-height: 1.72;
+      font-size: clamp(1rem, 1.05vw, 1.08rem);
+      line-height: 1.55;
       white-space: pre-line;
     }
 
@@ -1435,7 +1435,7 @@
       margin-right: 0;
       margin-left: auto;
       border-color: transparent;
-      border-radius: 23px 23px 7px 23px;
+      border-radius: 18px 18px 6px 18px;
       background: #18572f;
       color: white;
       box-shadow: 0 14px 34px rgba(24,87,47,.2);
@@ -1444,27 +1444,27 @@
     .message.user small { color: rgba(255,255,255,.7); }
 
     /* [Jerry 改版：AI 回覆中三點跳動氣泡；chatLoading 之後直接接 AWS 請求生命週期。] */
-    .typing-message { min-width: 142px; }
+    .typing-message { min-width: 126px; }
 
     .typing-status {
       display: flex;
-      min-height: 28px;
+      min-height: 24px;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .typing-label {
       color: #52665d;
-      font-size: .92rem;
+      font-size: .82rem;
       font-weight: 720;
     }
 
-    .typing-dots { display: inline-flex; align-items: center; gap: 6px; }
+    .typing-dots { display: inline-flex; align-items: center; gap: 5px; }
 
     .typing-dots i {
       display: block;
-      width: 9px;
-      height: 9px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #2f8051;
       animation: chat-typing-bounce 1.05s ease-in-out infinite;
@@ -1474,7 +1474,7 @@
     .typing-dots i:nth-child(3) { animation-delay: .28s; }
 
     .chat-compose-area {
-      padding: 14px clamp(16px, 2.2vw, 28px) 18px;
+      padding: 9px clamp(14px, 1.8vw, 24px) 10px;
       border-top: 1px solid rgba(31,65,59,.1);
       background: rgba(250,252,250,.94);
       box-shadow: 0 -12px 36px rgba(31,65,59,.06);
@@ -1485,21 +1485,21 @@
       display: flex;
       width: min(100%, 1040px);
       margin: 0 auto;
-      gap: 9px;
+      gap: 7px;
       overflow-x: auto;
-      padding: 0 0 11px;
+      padding: 0 0 7px;
       scrollbar-width: none;
     }
 
     .chat-chip {
       flex: 0 0 auto;
-      min-height: 40px;
-      padding: 0 15px;
+      min-height: 34px;
+      padding: 0 12px;
       border: 1px solid rgba(24,87,47,.18);
       border-radius: 999px;
       background: white;
       color: var(--forest);
-      font-size: .88rem;
+      font-size: .8rem;
       font-weight: 760;
     }
 
@@ -1512,41 +1512,41 @@
       grid-template-columns: minmax(0, 1fr) auto;
       width: 100%;
       margin: 0;
-      gap: 10px;
-      padding: 7px;
+      gap: 7px;
+      padding: 5px;
       border: 1px solid rgba(24,87,47,.18);
-      border-radius: 20px;
+      border-radius: 16px;
       background: white;
       box-shadow: 0 12px 32px rgba(31,65,59,.08);
     }
 
     .chat-input input {
       min-width: 0;
-      min-height: 52px;
-      padding: 0 16px;
+      min-height: 46px;
+      padding: 0 14px;
       border: 0;
       border-radius: 14px;
       outline: 0;
       background: transparent;
       color: var(--ink);
-      font-size: 1.05rem;
+      font-size: 1rem;
     }
 
     .chat-input input::placeholder { color: #87958f; }
 
     .chat-send {
       display: flex;
-      min-width: 106px;
-      min-height: 52px;
-      padding: 0 16px 0 19px;
+      min-width: 88px;
+      min-height: 46px;
+      padding: 0 13px 0 15px;
       align-items: center;
       justify-content: center;
       justify-self: end;
-      gap: 10px;
-      border-radius: 14px;
+      gap: 8px;
+      border-radius: 12px;
       background: var(--forest);
       color: white;
-      font-size: .98rem;
+      font-size: .9rem;
       font-weight: 800;
     }
 
@@ -1557,10 +1557,10 @@
 
     .chat-connection-note {
       width: min(100%, 1040px);
-      margin: 9px auto 0;
+      margin: 6px auto 0;
       color: #77867f;
-      font-size: .78rem;
-      line-height: 1.5;
+      font-size: .72rem;
+      line-height: 1.35;
       text-align: center;
     }
     /* ===== [Jerry 改版：全畫面 AI 對話工作區結束] ===== */
@@ -1636,24 +1636,25 @@
       .youbike-zero-district-list li { grid-template-columns: 24px 54px minmax(54px, 1fr) 44px; gap: 7px; padding: 12px 9px; }
       .chat-launcher { right: 16px; bottom: 18px; width: 62px; height: 62px; }
       .chat-panel { inset: 6px; border-radius: 22px; }
-      .chat-header { min-height: 76px; padding: 12px 14px; }
-      .chat-mark { width: 42px; height: 42px; border-radius: 13px; }
-      .chat-header strong { font-size: 1.18rem; }
+      /* [Jerry 改版：手機版同步收薄聊天區塊，保留更多訊息可視高度。] */
+      .chat-header { min-height: 66px; padding: 9px 12px; }
+      .chat-mark { width: 38px; height: 38px; border-radius: 12px; }
+      .chat-header strong { font-size: 1.08rem; }
       .chat-header .chat-title-group span:last-child { font-size: .72rem; }
       .chat-close { min-height: 44px; padding: 0 7px; }
       .chat-close > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
       .chat-close b { width: 30px; height: 30px; }
-      .messages { gap: 15px; padding: 22px 14px; }
-      .message { max-width: 86%; padding: 14px 16px 15px; border-radius: 19px 19px 19px 6px; }
-      .message.user { border-radius: 19px 19px 6px 19px; }
-      .message p { font-size: 1rem; line-height: 1.65; }
-      .message small { margin-bottom: 5px; font-size: .76rem; }
-      .chat-compose-area { padding: 10px 10px max(10px, env(safe-area-inset-bottom)); }
-      .chat-chips { gap: 7px; padding-bottom: 8px; }
-      .chat-chip { min-height: 36px; padding: 0 12px; font-size: .8rem; }
-      .chat-input { grid-template-columns: minmax(0, 1fr) 50px; gap: 5px; padding: 5px; border-radius: 16px; }
-      .chat-input input { min-height: 48px; padding: 0 11px; font-size: 1rem; }
-      .chat-send { min-width: 50px; min-height: 48px; padding: 0; border-radius: 12px; }
+      .messages { gap: 10px; padding: 14px 10px; }
+      .message { max-width: 90%; padding: 10px 13px 11px; border-radius: 16px 16px 16px 5px; }
+      .message.user { border-radius: 16px 16px 5px 16px; }
+      .message p { font-size: 1rem; line-height: 1.5; }
+      .message small { margin-bottom: 3px; font-size: .72rem; }
+      .chat-compose-area { padding: 7px 8px max(8px, env(safe-area-inset-bottom)); }
+      .chat-chips { gap: 6px; padding-bottom: 6px; }
+      .chat-chip { min-height: 32px; padding: 0 10px; font-size: .76rem; }
+      .chat-input { grid-template-columns: minmax(0, 1fr) 46px; gap: 4px; padding: 4px; border-radius: 14px; }
+      .chat-input input { min-height: 44px; padding: 0 10px; font-size: 1rem; }
+      .chat-send { min-width: 46px; min-height: 44px; padding: 0; border-radius: 10px; }
       .chat-send span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
       .chat-send b { font-size: 1.35rem; }
       .chat-connection-note { margin-top: 7px; font-size: .7rem; }
