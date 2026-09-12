@@ -7,6 +7,11 @@ on:
 
 concurrency:
   group: deploy
+  # Never abort a rollout midway: a half-applied deploy is worse than a queued one.
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
   DEPLOY_DIR: /home/ubuntu/202609-new-taipei-youth-living-circle-test
@@ -14,13 +19,79 @@ env:
 jobs:
   deploy:
     runs-on: [self-hosted, main]
+    timeout-minutes: 30
+    env:
+      # Vite inlines VITE_* vars at build time, so the key has to be present for
+      # `compose build`. Without it the CARTO basemap silently falls back to the
+      # free, watermarked tier.
+      VITE_CARTO_KEY: ${{ secrets.VITE_CARTO_KEY }}
+
     steps:
+      - name: Warn on missing CARTO key
+        # Checked through env because the secrets context is not usable in `if`.
+        if: ${{ env.VITE_CARTO_KEY == '' }}
+        run: echo "::warning::VITE_CARTO_KEY is not set; the CARTO basemap will use the free/watermarked tier."
+
       - name: Pull
         run: |
+          set -euo pipefail
           cd "$DEPLOY_DIR"
           git pull --ff-only
+          echo "Deploying $(git rev-parse --short HEAD)"
 
       - name: Compose up
         run: |
+          set -euo pipefail
           cd "$DEPLOY_DIR"
-          docker compose up -d --build --remove-orphans
+          # --pull keeps the node/nginx base images from going stale over time.
+          docker compose build --pull
+          docker compose up -d --remove-orphans
+
+      - name: Wait for container to become healthy
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          cid="$(docker compose ps -q web)"
+          if [ -z "$cid" ]; then
+            echo "::error::No container found for the web service."
+            docker compose ps
+            exit 1
+          fi
+          for attempt in $(seq 1 30); do
+            state="$(docker inspect -f '{{.State.Status}}' "$cid")"
+            health="$(docker inspect -f '{{.State.Health.Status}}' "$cid")"
+            echo "attempt ${attempt}: state=${state} health=${health}"
+            if [ "$health" = "healthy" ]; then
+              exit 0
+            fi
+            if [ "$state" = "exited" ] || [ "$state" = "dead" ]; then
+              break
+            fi
+            sleep 5
+          done
+          echo "::error::Container did not become healthy."
+          docker compose logs --tail 100 web
+          exit 1
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          # Ask compose for the real published port instead of hardcoding it, so
+          # this stays correct if the port mapping in compose.yml changes.
+          addr="$(docker compose port web 8080)"
+          port="${addr##*:}"
+          curl --fail --silent --show-error --max-time 10 \
+            "http://127.0.0.1:${port}/healthz" >/dev/null
+          # Proves the built bundle is actually in the image, not just that nginx runs.
+          curl --fail --silent --show-error --max-time 10 \
+            "http://127.0.0.1:${port}/" | grep -q '<div id="app">'
+          echo "Smoke test passed on port ${port}."
+
+      - name: Prune dangling images
+        if: always()
+        run: |
+          set -euo pipefail
+          # `compose build` retags :local each run, so the previous build is left
+          # dangling. Without this the server's disk fills up over time.
+          docker image prune --force
