@@ -104,6 +104,8 @@ export const appState = reactive({
   selectedAgeGroups: [...AGE_GROUPS],
   chatOpen: false,
   chatInput: "",
+  /* [Jerry 改版：保留 AI 請求中的狀態，日後接 AWS API 時可直接驅動聊天室載入動畫。] */
+  chatLoading: false,
   chatChips: ["哪裡最適合設點？", "30 分鐘怎麼算？", "幫我看預算方案"],
   chatMessages: [
     { role: "assistant", text: "嗨，我是生活圈 AI 助理。你可以問我青年熱區、30 分鐘覆蓋或預算配置。" },
@@ -364,15 +366,28 @@ export const appState = reactive({
   },
   async sendChat(messagesEl) {
     const text = this.chatInput.trim();
-    if (!text) return;
+    if (!text || this.chatLoading) return;
     this.chatMessages.push({ role: "user", text: text });
     this.chatInput = "";
+    this.chatLoading = true;
+    await nextTick();
+    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    /* [Jerry 改版：現在由前端情境回覆示範；未來 getChatReply 接 AWS AI 後，
+       跳動氣泡會自然維持到真正回覆完成。最短顯示時間避免本機回覆快到看不見。] */
+    const loadingStartedAt = Date.now();
     let answer;
     try {
       answer = await this.getChatReply(text);
     } catch (error) {
       answer = "雲端服務目前未開放，我先使用本機情境回覆。";
     }
+    const minimumLoadingTime = 560;
+    const loadingTimeLeft = minimumLoadingTime - (Date.now() - loadingStartedAt);
+    if (loadingTimeLeft > 0) {
+      await new Promise(function (resolve) { setTimeout(resolve, loadingTimeLeft); });
+    }
+    this.chatLoading = false;
     this.chatMessages.push({ role: "assistant", text: answer });
     await nextTick();
     if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
