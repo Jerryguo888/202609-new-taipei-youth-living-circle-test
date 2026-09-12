@@ -426,6 +426,12 @@ export function ensureIntegratedTransitLayers() {
 }
 
 export function clearIntegratedResults(clearOrigin, restoreContext) {
+  /* [Jerry 2026-09-13 修正：清空時一併停止尚未結束的逐分鐘動畫，
+     否則下一個 tick 會把已清掉的可達節點重新寫回來源。] */
+  if (animateIntegratedTimer !== null) {
+    clearTimeout(animateIntegratedTimer);
+    animateIntegratedTimer = null;
+  }
   if (restoreContext !== false) setIntegratedAnimationFocus(false);
   setIntegratedSourceData("integrated-result-line-source", emptyFeatureCollection());
   setIntegratedSourceData("integrated-result-point-source", emptyFeatureCollection());

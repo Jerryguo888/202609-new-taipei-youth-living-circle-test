@@ -126,6 +126,10 @@ function handleTransitLayerChange(mode, event) {
                   <div><strong>{{ appState.metrics.wait }}</strong><span>起始候車</span></div>
                 </div>
                 <p class="integrated-model-note">已納入平均候車、站間行駛、停靠、步行轉乘與轉乘候車；目前為規劃估算。</p>
+                <!-- [Jerry 2026-09-13 新增：清除本次 30 分鐘結果並停止動畫，
+                     回到人口柱與基礎交通標點的初始顯示。] -->
+                <button type="button" class="map-clear-button" :disabled="!appState.reachabilityActive"
+                        @click="appState.clearReachability">清空 30 分鐘結果</button>
                 <button class="map-reset-button" @click="appState.resetPopulationMapView">回到新北全區</button>
                   </div>
                 </details>
