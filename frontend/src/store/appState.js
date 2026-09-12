@@ -229,7 +229,7 @@ export const appState = reactive({
   toggleAgeGroup(age, visible) {
     const index = this.selectedAgeGroups.indexOf(age);
     if (!visible) {
-      if (this.selectedAgeGroups.length === 1) return; // 至少保留一項，跟原本圖例邏輯一致
+      /* [Jerry 2026-09-13 修正：允許取消最後一個項目，才能真正清空所有人口柱。] */
       if (index >= 0) this.selectedAgeGroups.splice(index, 1);
     } else if (index < 0) {
       this.selectedAgeGroups.push(age);
