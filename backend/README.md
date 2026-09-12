@@ -36,11 +36,39 @@ FastAPI (chat 容器, :8000)  app.py
 | `KB_NUM_RESULTS` | `5` | 每次檢索取幾個片段 |
 | `KB_SEARCH_MODE` | `managed` | `managed` 為 S3 Vectors 這類受管知識庫，`vector` 為自建向量庫 |
 | `SYSTEM_PROMPT` | 見 `app.py` | 留空使用內建的生活圈助理提示詞 |
+| `ENABLE_CHARTS` | `true` | 是否要求模型畫圖表，設 `false` 只回文字 |
 | `MAX_HISTORY_MESSAGES` | `20` | 送給模型的歷史訊息上限 |
 | `MAX_MESSAGE_CHARS` | `4000` | 單則訊息長度上限 |
 
 `KB_SEARCH_MODE` 填錯時後端會接到 `ValidationException`，並自動改用另一種
 search config 重試一次，所以設定寫反不會直接壞掉。
+
+`SYSTEM_PROMPT` 只換掉人格設定，圖表指示是另一個常數（`CHART_INSTRUCTIONS`）
+永遠附加在後面，所以覆寫提示詞不會把畫圖能力一起弄掉。
+
+## 圖表
+
+模型會把圖表放在 ```` ```chart ```` 圍籬區塊裡，內容是一小段受限的 HTML
+（橫條圖或表格）。前端**不會**直接渲染模型輸出：
+
+```text
+backend/app.py  CHART_INSTRUCTIONS      告訴模型可用的標籤與 class
+      ↓
+frontend/src/lib/chartHtml.js           DOMPurify 白名單消毒 + class/style 過濾
+      ↓
+frontend/src/style/global.css           .ai-chart* 實際樣式
+```
+
+這三處的 class 清單必須一致，改一邊沒改另一邊，圖表會被清掉一部分。
+
+模型能控制的只有長條的 `width: N%`，顏色和排版都由 CSS 決定。對話的散文部分
+完全不走 HTML 路徑，仍由 Vue 以純文字轉義輸出。
+
+之所以要消毒而不是直接 `v-html`：模型讀得到 S3 知識庫，而知識庫內容是不可信
+輸入。只要有人把一份帶提示注入的文件放進 S3，就可能讓模型吐出
+`<img onerror=...>`，直接渲染等於開一個 XSS，而且觸發來源是我們自己的後端。
+消毒規則涵蓋 script、事件屬性、`javascript:` URL、外部資源載入、CSS `url()`
+外連與 position 覆蓋等手法。
 
 ## 部署到 EC2
 

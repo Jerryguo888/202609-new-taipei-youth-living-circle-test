@@ -26,6 +26,8 @@ import {
   redrawPopulationBars,
 } from "../lib/mapLibreMap.js";
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
+/* [2026-09-12 新增：模型會輸出圖表 HTML，一律先經過 chartHtml.js 消毒。] */
+import { splitChartBlocks } from "../lib/chartHtml.js";
 import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
 import { estimateTransitGapRows } from "../lib/transitGap.js";
 import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
@@ -408,10 +410,20 @@ export const appState = reactive({
     function handleDelta(delta, full) {
       if (!streamingMessage) {
         store.chatLoading = false;
-        streamingMessage = { role: "assistant", text: "", sources: [] };
+        streamingMessage = { role: "assistant", text: "", sources: [], charts: [] };
         store.chatMessages.push(streamingMessage);
       }
-      streamingMessage.text = full;
+      /* 沒有圍籬符號時走快速路徑，不必每個 token 都重跑一次消毒；
+         純文字回覆因此完全不碰 DOMPurify。 */
+      if (full.indexOf("```") === -1) {
+        streamingMessage.text = full;
+      } else {
+        /* 已收尾的圖表邊串邊畫，還沒收尾的用提示文字代替，
+           使用者才不會看到一堆生 HTML 標記。 */
+        const partial = splitChartBlocks(full, true);
+        streamingMessage.text = partial.text;
+        streamingMessage.charts = partial.charts;
+      }
       nextTick(function () { scrollChatToBottom(messagesEl); });
     }
 
@@ -429,7 +441,13 @@ export const appState = reactive({
 
     if (streamingMessage) {
       this.chatLoading = false;
-      streamingMessage.text = reply.text || streamingMessage.text;
+      const finalText = reply.text || streamingMessage.text;
+      /* 收尾後重跑一次（streaming=false），把「正在繪製圖表…」的提示換成真的圖表。 */
+      const done = splitChartBlocks(finalText, false);
+      streamingMessage.charts = done.charts;
+      /* 只有圖表沒有文字是合法的；真的兩者都空才退回顯示原文，
+         免得回覆整段消失。 */
+      streamingMessage.text = done.text || (done.charts.length ? "" : finalText);
       streamingMessage.sources = reply.sources || [];
       if (reply.partialError) {
         streamingMessage.text += "\n\n（回覆中斷：" + reply.partialError + "）";
@@ -442,7 +460,13 @@ export const appState = reactive({
       this.chatLoading = false;
       let body = reply.text;
       if (reply.notice) body += "\n\n（" + reply.notice + "，以上為本機情境回覆）";
-      this.chatMessages.push({ role: "assistant", text: body, sources: reply.sources || [] });
+      const done = splitChartBlocks(body, false);
+      this.chatMessages.push({
+        role: "assistant",
+        text: done.text || (done.charts.length ? "" : body),
+        charts: done.charts,
+        sources: reply.sources || [],
+      });
     }
 
     await nextTick();

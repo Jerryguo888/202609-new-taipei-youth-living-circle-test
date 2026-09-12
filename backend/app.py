@@ -68,6 +68,66 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 SYSTEM_PROMPT = env_str("SYSTEM_PROMPT", DEFAULT_SYSTEM_PROMPT)
 
+ENABLE_CHARTS = env_str("ENABLE_CHARTS", "true").lower() not in ("false", "0", "no")
+
+# 圖表指示刻意跟 SYSTEM_PROMPT 分開，並且永遠附加在後面。
+# 這樣有人用環境變數換掉人格設定時，不會連圖表能力一起弄掉。
+#
+# 這份標籤與 class 的清單就是前端 sanitizer 的允許清單（見
+# frontend/src/lib/chartHtml.js）。兩邊必須一致：模型用了清單外的東西，
+# 前端會直接清掉，圖表就會缺一塊。改這裡務必同步改前端。
+CHART_INSTRUCTIONS = """
+## 畫圖表
+
+當答案涉及排名、比較、佔比或分佈時，除了文字說明，請一併輸出一段圖表。
+圖表要放在 ```chart 圍籬區塊裡，區塊內只能是下面規定的 HTML。
+
+橫條圖（最常用，適合行政區排名）：
+
+```chart
+<div class="ai-chart">
+  <h4 class="ai-chart-title">20~29 歲青年人口前三名</h4>
+  <div class="ai-chart-row">
+    <span class="ai-chart-label">板橋區</span>
+    <span class="ai-chart-track"><span class="ai-chart-bar" style="width: 100%"></span></span>
+    <span class="ai-chart-value">82,431 人</span>
+  </div>
+  <div class="ai-chart-row">
+    <span class="ai-chart-label">中和區</span>
+    <span class="ai-chart-track"><span class="ai-chart-bar" style="width: 78%"></span></span>
+    <span class="ai-chart-value">64,512 人</span>
+  </div>
+  <p class="ai-chart-note">資料為推估值</p>
+</div>
+```
+
+表格（適合多欄位對照）：
+
+```chart
+<table class="ai-table">
+  <caption>各行政區托育稀缺率</caption>
+  <thead><tr><th scope="col">行政區</th><th scope="col">稀缺率</th></tr></thead>
+  <tbody><tr><th scope="row">林口區</th><td>68%</td></tr></tbody>
+</table>
+```
+
+規則，請嚴格遵守：
+
+1. 只能使用這些標籤：div、span、h4、p、strong、em、br、ul、ol、li、
+   table、caption、thead、tbody、tr、th、td。
+2. 只能使用這些 class：ai-chart、ai-chart-title、ai-chart-row、
+   ai-chart-label、ai-chart-track、ai-chart-bar、ai-chart-bar-alt、
+   ai-chart-value、ai-chart-note、ai-table。
+3. 唯一允許的 style 是長條的寬度百分比，例如 style="width: 62%"。
+   不要寫顏色、字型、position 或任何其他 CSS。
+4. 絕對不要輸出 script、style、img、svg、iframe、連結、on* 事件屬性，
+   或任何會載入外部資源的東西。這些都會被前端移除。
+5. 長條寬度用相對比例：最大值那一條給 100%，其餘按比例換算。
+6. 一次最多兩張圖表，每張最多 10 列，否則畫面會太擁擠。
+7. 圍籬區塊外面要有文字結論，不要只丟圖表。數字沿用知識庫或前文的資料，
+   沒有依據時不要自己編。
+"""
+
 # 逾時設得比 nginx 的 proxy_read_timeout 短，讓錯誤由這裡回報而不是被 502 蓋掉。
 _boto_config = Config(
     region_name=AWS_REGION,
@@ -173,6 +233,9 @@ def retrieve_from_kb(query: str) -> list[dict]:
 
 def build_system_prompt(chunks: list[dict], context: ChatContext | None) -> str:
     parts = [SYSTEM_PROMPT]
+
+    if ENABLE_CHARTS:
+        parts.append(CHART_INSTRUCTIONS.strip())
 
     if context and (context.activeView or context.minuteLimit):
         state = []
