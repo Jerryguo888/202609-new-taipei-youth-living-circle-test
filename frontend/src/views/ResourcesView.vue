@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { appState } from "../store/appState.js";
+import MortalityBarRows from "../components/MortalityBarRows.vue";
 import { loadYouBikeDashboard } from "../lib/youbike.js";
 
 /* ===== [Jerry 新增：YouBike 面板狀態開始] ===== */
@@ -64,9 +65,6 @@ function closeZeroStationPanel() {
   document.body.classList.remove("has-youbike-zero-panel");
 }
 
-onBeforeUnmount(closeZeroStationPanel);
-/* ===== [Jerry 新增：全部零車站右側面板結束] ===== */
-
 onMounted(async function () {
   try {
     youbikeData.value = await loadYouBikeDashboard();
@@ -77,7 +75,44 @@ onMounted(async function () {
     youbikeLoading.value = false;
   }
 });
-/* ===== [Jerry 新增：YouBike 面板狀態結束] ===== */
+/* ===== [Jerry 新增：全部零車站右側面板結束] ===== */
+
+/* [保留組員最新版：青年健康指標 dialog 開關與焦點還原] */
+const mortalityDialog = ref(null);
+const mortalityTrigger = ref(null);
+let previousBodyOverflow = "";
+
+function openMortalityDialog() {
+  if (!appState.mortalityRows.length || !mortalityDialog.value || mortalityDialog.value.open) return;
+  previousBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+  mortalityDialog.value.showModal();
+}
+
+function closeMortalityDialog() {
+  if (mortalityDialog.value && mortalityDialog.value.open) mortalityDialog.value.close();
+}
+
+function handleMortalityDialogClose() {
+  document.body.style.overflow = previousBodyOverflow;
+  nextTick(function () {
+    if (mortalityTrigger.value) mortalityTrigger.value.focus();
+  });
+}
+
+function handleMortalityBackdropClick(event) {
+  if (event.target !== mortalityDialog.value) return;
+  const bounds = mortalityDialog.value.getBoundingClientRect();
+  const outside = event.clientX < bounds.left || event.clientX > bounds.right
+    || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  if (outside) closeMortalityDialog();
+}
+
+onBeforeUnmount(function () {
+  closeZeroStationPanel();
+  if (mortalityDialog.value && mortalityDialog.value.open) mortalityDialog.value.close();
+  document.body.style.overflow = previousBodyOverflow;
+});
 </script>
 
 <template>
@@ -244,6 +279,85 @@ onMounted(async function () {
           </details>
         </article>
       </div>
+
+      <!-- [本次新增：青年健康指標獨立附加在既有托育圖表後方，不改動 resourceGaps.childcare] -->
+      <section class="mortality-section" aria-labelledby="mortality-section-title">
+        <div class="toolbar mortality-toolbar">
+          <span><strong id="mortality-section-title">青年健康指標 Top 5</strong></span>
+          <span class="info-tag">民國 {{ appState.mortalityYear || "—" }} 年・20–29歲</span>
+        </div>
+        <article ref="mortalityTrigger" class="resource-chart-card mortality-chart-card"
+                 :class="{ 'is-disabled': !appState.mortalityRows.length }"
+                 :tabindex="appState.mortalityRows.length ? 0 : -1"
+                 :aria-disabled="!appState.mortalityRows.length"
+                 role="button" aria-haspopup="dialog" aria-describedby="mortality-chart-description"
+                 @click="openMortalityDialog"
+                 @keydown.enter="openMortalityDialog"
+                 @keydown.space.prevent="openMortalityDialog">
+          <div class="resource-chart-title">
+            <div class="mortality-preview-title-row">
+              <h2>20–29歲自殺死亡占比</h2>
+              <strong v-if="appState.mortalityRows.length" class="mortality-city-summary">
+                全新北市：{{ appState.mortalityCitySummary.ratio === null
+                  ? "—"
+                  : appState.mortalityCitySummary.ratio.toFixed(1) + "%" }}
+                <small>（{{ appState.mortalityCitySummary.suicideDeaths }}/{{ appState.mortalityCitySummary.totalDeaths }}）</small>
+              </strong>
+            </div>
+            <p id="mortality-chart-description">
+              各行政區自殺死亡數占同齡全部死因死亡數的比例；點擊圖表查看全部29區。
+            </p>
+          </div>
+          <p v-if="appState.mortalityLoading" class="resource-chart-status">
+            {{ appState.mortalityStatus }}
+          </p>
+          <p v-else-if="appState.mortalityStatus" class="resource-chart-status is-error">
+            {{ appState.mortalityStatus }}
+          </p>
+          <MortalityBarRows :rows="appState.mortalityTop5Rows" />
+          <div v-if="appState.mortalityRows.length" class="mortality-chart-footer">
+            <p>占比＝自殺死亡數（代碼131）÷ 同年度20–29歲全部死因死亡數</p>
+            <span>查看全部29區</span>
+          </div>
+        </article>
+      </section>
     </div>
+
+    <!-- 使用原生 dialog 提供焦點限制、Escape 關閉與 modal semantics，不使用 Fullscreen API。 -->
+    <dialog ref="mortalityDialog" class="mortality-dialog"
+            aria-labelledby="mortality-dialog-title" aria-describedby="mortality-dialog-description"
+            @close="handleMortalityDialogClose" @click="handleMortalityBackdropClick">
+      <section class="mortality-dialog-panel">
+        <header class="mortality-dialog-header">
+          <div>
+            <p class="section-kicker">Youth Health Indicator</p>
+            <div class="mortality-dialog-title-row">
+              <h2 id="mortality-dialog-title">新北市29區20–29歲自殺死亡占比</h2>
+              <strong class="mortality-city-summary">
+                全新北市：{{ appState.mortalityCitySummary.ratio === null
+                  ? "—"
+                  : appState.mortalityCitySummary.ratio.toFixed(1) + "%" }}
+                <small>（{{ appState.mortalityCitySummary.suicideDeaths }}/{{ appState.mortalityCitySummary.totalDeaths }}）</small>
+              </strong>
+            </div>
+            <p id="mortality-dialog-description">
+              民國 {{ appState.mortalityYear }} 年，依比例由高到低排序；括號顯示自殺死亡數／全部死亡數。
+            </p>
+          </div>
+          <button type="button" class="mortality-dialog-close" aria-label="關閉完整行政區排行"
+                  @click="closeMortalityDialog">×</button>
+        </header>
+        <div class="mortality-dialog-body">
+          <div class="mortality-dialog-note">
+            <strong>判讀提醒</strong>
+            <span>「樣本少」代表該區當年度同齡死亡總數少於5人，比例容易大幅波動，不宜單獨作為資源配置結論。</span>
+          </div>
+          <MortalityBarRows :rows="appState.mortalityRows" show-rank />
+          <p class="mortality-data-source">
+            資料來源：新北市死因統計97-114.csv；年齡代碼3；自殺死因代碼131。
+          </p>
+        </div>
+      </section>
+    </dialog>
   </section>
 </template>

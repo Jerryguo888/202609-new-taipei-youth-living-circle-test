@@ -28,6 +28,7 @@ import {
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
 import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
 import { estimateTransitGapRows } from "../lib/transitGap.js";
+import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
 
 const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—" };
 
@@ -73,11 +74,16 @@ export const appState = reactive({
   childcareGapLoaded: false,
   childcareGapLoading: false,
   childcareGapStatus: "托育缺口資料待載入",
-  /* [本次新增：交通稀缺率也是非同步估算（需要先載入公車／捷運路網並跑可達性抽樣），
-     用同一套載入狀態旗標的命名慣例] */
+  /* [整合保留：交通稀缺率與健康指標各自有獨立載入狀態，互不覆蓋] */
   transitGapLoaded: false,
   transitGapLoading: false,
   transitGapStatus: "交通稀缺率資料待載入",
+  /* [本次新增：死因統計使用獨立狀態，不影響既有托育缺口資料與錯誤處理] */
+  mortalityLoaded: false,
+  mortalityLoading: false,
+  mortalityStatus: "死因統計資料待載入",
+  mortalityYear: "",
+  mortalityRows: [],
   stopMode: "bus",
   stationGroups: [],
   activeDistrict: "板橋區",
@@ -160,12 +166,30 @@ export const appState = reactive({
       };
     }, this);
   },
-  /* [本次新增：每一類資源缺口各自非同步載入，卡片要顯示各自的載入中／失敗訊息，
-     用這個小 map 讓 ResourcesView.vue 不用針對每個 key 各寫一次 if/else] */
+  /* [整合修正：組員健康指標加入後仍保留托育／交通兩張卡各自的載入狀態] */
   get resourceGapLoadingInfo() {
     return {
       childcare: { loading: this.childcareGapLoading, status: this.childcareGapStatus },
       transit: { loading: this.transitGapLoading, status: this.transitGapStatus },
+    };
+  },
+  /* [本次新增：完整排行保留在 mortalityRows，首頁卡片只取排序後前五名] */
+  get mortalityTop5Rows() {
+    return this.mortalityRows.slice(0, 5);
+  },
+  /* [本次新增：由29區資料動態加總全新北市的同齡自殺死亡占比，供放大圖表標題顯示] */
+  get mortalityCitySummary() {
+    const totals = this.mortalityRows.reduce(function (summary, row) {
+      summary.suicideDeaths += row.suicideDeaths;
+      summary.totalDeaths += row.totalDeaths;
+      return summary;
+    }, { suicideDeaths: 0, totalDeaths: 0 });
+    return {
+      suicideDeaths: totals.suicideDeaths,
+      totalDeaths: totals.totalDeaths,
+      ratio: totals.totalDeaths > 0
+        ? Math.round((totals.suicideDeaths / totals.totalDeaths) * 1000) / 10
+        : null,
     };
   },
 
@@ -240,9 +264,7 @@ export const appState = reactive({
       this.childcareGapLoading = false;
     }
   },
-  /* [本次新增：交通稀缺率也非同步估算；會連帶觸發公車／捷運路網載入與
-     30 分鐘可達性抽樣（跟整合地圖共用同一份模組級快取，不會重算兩次），
-     首次進資源缺口頁可能要等一下，所以一樣有自己的載入狀態文字。] */
+  /* [整合保留：交通稀缺率與青年健康指標同時存在，避免合併時互相取代] */
   async loadTransitGapData() {
     if (this.transitGapLoaded || this.transitGapLoading) return;
     this.transitGapLoading = true;
@@ -257,6 +279,24 @@ export const appState = reactive({
       this.transitGapStatus = "資料載入失敗。" + dataLoadHint();
     } finally {
       this.transitGapLoading = false;
+    }
+  },
+  /* [本次新增：死因統計獨立載入；失敗時不會清空或遮蔽既有托育圖表] */
+  async loadMortalityData() {
+    if (this.mortalityLoaded || this.mortalityLoading) return;
+    this.mortalityLoading = true;
+    this.mortalityStatus = "讀取20~29歲死因統計…";
+    try {
+      const result = await loadYouthSuicideShareRows();
+      this.mortalityYear = result.year;
+      this.mortalityRows = result.rows;
+      this.mortalityLoaded = true;
+      this.mortalityStatus = "";
+    } catch (error) {
+      console.error(error);
+      this.mortalityStatus = "資料載入失敗。" + dataLoadHint();
+    } finally {
+      this.mortalityLoading = false;
     }
   },
   chooseStop(nodeId, moveMap) {
@@ -353,6 +393,11 @@ export async function ensureViewReady(view) {
     ensureIntegratedTransitLayers();
     setIntegratedTransitVisibility(appState.showTransitStops);
   } else if (view === "resources") {
-    await Promise.all([appState.loadResourceGapData(), appState.loadTransitGapData()]);
+    /* [整合修正：三種資料並行載入，任一功能不會阻塞或覆蓋另外兩種] */
+    await Promise.all([
+      appState.loadResourceGapData(),
+      appState.loadTransitGapData(),
+      appState.loadMortalityData(),
+    ]);
   }
 }
