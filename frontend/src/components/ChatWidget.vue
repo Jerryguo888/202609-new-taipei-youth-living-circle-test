@@ -1,6 +1,8 @@
 <script setup>
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 import { appState } from "../store/appState.js";
+import aiAvatar from "../assets/youth-ai-avatar.png";
+import userAvatar from "../assets/jerry-user-avatar.png";
 
 const messagesEl = ref(null);
 const chatPanelEl = ref(null);
@@ -11,11 +13,6 @@ function handleSend() {
   appState.sendChat(messagesEl.value);
 }
 
-function handleChip(chip) {
-  appState.chatInput = chip;
-  handleSend();
-}
-
 function closeChat() {
   appState.chatOpen = false;
   nextTick(function () {
@@ -23,78 +20,79 @@ function closeChat() {
   });
 }
 
-/* [Jerry 改版：全畫面聊天室開啟時鎖住底層頁面，並把焦點移到輸入框。] */
+/* [Jerry 改版：右側手機型聊天室開啟後聚焦輸入框，並顯示最新一則訊息。] */
 watch(function () { return appState.chatOpen; }, async function (isOpen) {
-  document.body.classList.toggle("has-chat-open", isOpen);
   if (!isOpen) return;
   await nextTick();
   chatPanelEl.value?.focus();
   chatInputEl.value?.focus();
-});
-
-onBeforeUnmount(function () {
-  document.body.classList.remove("has-chat-open");
+  if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
 });
 </script>
 
 <template>
-  <!-- ===== [Jerry 改版：全畫面 AI 對話工作區開始] ===== -->
+  <!-- ===== [Jerry 改版：右側手機型 AI 聊天室開始] ===== -->
   <Teleport to="body">
-    <Transition name="chat-fullscreen">
+    <Transition name="chat-drawer">
       <section v-if="appState.chatOpen" id="chat-panel" ref="chatPanelEl" tabindex="-1"
-               class="chat-panel" role="dialog" aria-modal="true" aria-labelledby="chat-title"
+               class="chat-panel" role="dialog" aria-labelledby="chat-title"
                @keydown.esc="closeChat">
         <header class="chat-header">
           <div class="chat-title-group">
-            <span class="chat-mark" aria-hidden="true">AI</span>
-            <div>
-              <strong id="chat-title">生活圈 AI 助理</strong>
-              <span>DEMO · 尚未連接 AWS 模型</span>
-            </div>
+            <strong id="chat-title">生活圈 AI 對話</strong>
           </div>
           <button type="button" class="chat-close" @click="closeChat" aria-label="關閉生活圈 AI 助理">
-            <span>關閉</span><b aria-hidden="true">×</b>
+            <span aria-hidden="true">×</span>
           </button>
         </header>
 
         <main class="chat-workspace">
           <div class="messages" ref="messagesEl" aria-live="polite">
-            <div class="message" :class="{ user: message.role === 'user' }"
-                 v-for="(message, index) in appState.chatMessages" :key="index">
-              <small>{{ message.role === "user" ? "你" : "AI 助理" }}</small>
-              <p>{{ message.text }}</p>
-            </div>
-            <!-- [Jerry 改版：非同步 AI 回覆期間顯示三點跳動氣泡，之後串 AWS API 不需重做版面。] -->
-            <div v-if="appState.chatLoading" class="message typing-message" role="status" aria-label="AI 助理正在回覆">
-              <small>AI 助理</small>
-              <div class="typing-status">
-                <span class="typing-label">回覆中</span>
-                <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <!-- [Jerry 改版：名稱移到訊息上方，AI 靠左、Jerry 靠右，兩側各自顯示頭貼。] -->
+            <article class="chat-message-row" :class="{ user: message.role === 'user' }"
+                     v-for="(message, index) in appState.chatMessages" :key="index">
+              <img class="chat-avatar" :class="{ 'is-user': message.role === 'user' }"
+                   :src="message.role === 'user' ? userAvatar : aiAvatar" alt="">
+              <div class="chat-message-content">
+                <small class="chat-message-name">{{ message.role === "user" ? "USER" : "生活圈 AI 助理" }}</small>
+                <div class="message" :class="{ user: message.role === 'user' }">
+                  <p>{{ message.text }}</p>
+                </div>
               </div>
-            </div>
+            </article>
+            <!-- [Jerry 改版：非同步 AI 回覆期間顯示三點跳動氣泡，之後串 AWS API 不需重做版面。] -->
+            <article v-if="appState.chatLoading" class="chat-message-row" role="status" aria-label="AI 助理正在回覆">
+              <img class="chat-avatar" :src="aiAvatar" alt="">
+              <div class="chat-message-content">
+                <small class="chat-message-name">生活圈 AI 助理</small>
+                <div class="message typing-message">
+                  <div class="typing-status">
+                    <span class="typing-label">回覆中</span>
+                    <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  </div>
+                </div>
+              </div>
+            </article>
           </div>
         </main>
 
         <footer class="chat-compose-area">
-          <div class="chat-chips" aria-label="快速提問">
-            <button type="button" class="chat-chip" v-for="chip in appState.chatChips" :key="chip"
-                    :disabled="appState.chatLoading" @click="handleChip(chip)">{{ chip }}</button>
-          </div>
           <div class="chat-input">
             <input ref="chatInputEl" v-model="appState.chatInput" @keydown.enter.exact.prevent="handleSend"
                    aria-label="輸入問題" placeholder="問選址、30 分鐘覆蓋或預算配置…">
             <button type="button" class="chat-send" :disabled="appState.chatLoading"
                     @click="handleSend" aria-label="送出訊息">
-              <span>送出</span><b aria-hidden="true">↑</b>
+              <span aria-hidden="true">➤</span>
             </button>
           </div>
-          <p class="chat-connection-note">目前使用前端示範回覆；AWS AI 服務開放後將由同一個輸入框串接。</p>
         </footer>
       </section>
     </Transition>
   </Teleport>
 
   <button v-if="!appState.chatOpen" ref="chatLauncherEl" type="button" class="chat-launcher" aria-controls="chat-panel"
-          aria-label="開啟生活圈 AI 助理" @click="appState.chatOpen = true">AI</button>
-  <!-- ===== [Jerry 改版：全畫面 AI 對話工作區結束] ===== -->
+          aria-label="開啟生活圈 AI 助理" @click="appState.chatOpen = true">
+    <img :src="aiAvatar" alt="">
+  </button>
+  <!-- ===== [Jerry 改版：右側手機型 AI 聊天室結束] ===== -->
 </template>
