@@ -223,25 +223,36 @@ export function ensureTransitReachCache(onProgress, departureTime) {
 }
 
 /* [本次新增：把每個交通節點的 30 分鐘可達站數平均到行政區層級，
-   再套用「可達站數 ÷ 區內站數 × 區內青年人口」算出每個行政區單一分數，
-   供 3D 人口地圖疊加為第三段柱狀（不再逐站繪製）] */
-export function buildDistrictTransitScores(year, popByYearRef) {
-  const youthByDistrict = new Map();
-  (popByYearRef[year] || []).forEach(function (row) {
-    youthByDistrict.set(row.area, row.a1 + row.a2);
-  });
+   抽出成獨立函式，供「交通可及性」疊圖分數與資源缺口頁的「交通稀缺率」
+   長條圖共用同一份原始平均可達站數，不用各自重算一次] */
+export function buildDistrictReachAverages() {
   const reachSumByDistrict = new Map();
   transitNodes.forEach(function (node) {
     const reach = transitReachCache.get(node.id);
     if (reach === undefined) return;
     reachSumByDistrict.set(node.district, (reachSumByDistrict.get(node.district) || 0) + reach);
   });
-  const scores = new Map();
+  const averages = new Map();
   reachSumByDistrict.forEach(function (reachSum, district) {
-    const totalStations = districtStationTotals.get(district);
     const sampleCount = districtReachSampleCounts.get(district);
-    if (!totalStations || !sampleCount) return;
-    const avgReach = reachSum / sampleCount;
+    if (!sampleCount) return;
+    averages.set(district, reachSum / sampleCount);
+  });
+  return averages;
+}
+
+/* 套用「可達站數 ÷ 區內站數 × 區內青年人口」算出每個行政區單一分數，
+   供 3D 人口地圖疊加為第三段柱狀（不再逐站繪製） */
+export function buildDistrictTransitScores(year, popByYearRef) {
+  const youthByDistrict = new Map();
+  (popByYearRef[year] || []).forEach(function (row) {
+    youthByDistrict.set(row.area, row.a1 + row.a2);
+  });
+  const averages = buildDistrictReachAverages();
+  const scores = new Map();
+  averages.forEach(function (avgReach, district) {
+    const totalStations = districtStationTotals.get(district);
+    if (!totalStations) return;
     const youthPop = youthByDistrict.get(district) || 0;
     scores.set(district, (avgReach / totalStations) * youthPop);
   });

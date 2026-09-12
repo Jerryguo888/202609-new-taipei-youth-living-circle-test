@@ -1,7 +1,10 @@
 import { DATA_FILES } from "./data/dataFiles.js";
 import { loadPopulationCsv } from "./data/fetchCsv.js";
 
-/* [本次改版：托育資源稀缺改成公私立分開估算，並且輸出「稀缺率」而不是缺口席次]
+/* [本次改版：圖表點開後要能看到「所有區域」的稀缺率，不能只回傳稀缺的區，
+   所以這裡改成回傳資料集裡每一區的稀缺率（含 0% 已達平均水準的區），
+   排行前五名的篩選交給 appState.js 的 resourceGapCharts 處理。]
+   托育資源稀缺改成公私立分開估算，並且輸出「稀缺率」而不是缺口席次。
    方法（MVP 概念估算，非官方精確值）：
    1. 用「新北市托嬰機構數量統計.csv」拆出每區「公共托育中心」與「私立托嬰機構」
       兩類機構數；用「新北市20至34歲人數.csv」最新一年的 20~29 歲人口當作
@@ -82,7 +85,8 @@ export async function estimateChildcareGapRows() {
     const publicRate = (gapByType.public / expectedTotal) * 100;
     const privateRate = (gapByType.private / expectedTotal) * 100;
     const scarcityRate = publicRate + privateRate;
-    if (scarcityRate <= 0) return;
+    /* 稀缺率 0% 代表已達或超過全市平均水準，仍然保留這筆資料，
+       這樣點開「所有區域」清單時才看得到完整區數，不會只看到有缺口的區。 */
 
     rows.push({
       area: area,
