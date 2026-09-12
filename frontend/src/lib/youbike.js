@@ -12,7 +12,10 @@ function asNumber(value) {
 
 function normalizeStation(row) {
   return {
+    id: String(row.sno || row.id || ""),
+    name: String(row.sna || row.name || "未命名場站").replace(/^YouBike2\.0_/, ""),
     district: String(row.sarea || row.district || "未分類"),
+    address: String(row.ar || row.address || "地址未提供"),
     docks: asNumber(row.tot_quantity ?? row.tot ?? row.total),
     available: asNumber(row.sbi_quantity ?? row.sbi ?? row.available),
     updatedAt: row.mday || row.updatedAt || "",
@@ -28,6 +31,7 @@ function parseOfficialTime(value) {
 
 function summarize(stations, payloadUpdatedAt, isSnapshot) {
   const zeroByDistrict = new Map();
+  const zeroStations = [];
   let totalDocks = 0;
   let availableBikes = 0;
   let zeroBikeStations = 0;
@@ -37,8 +41,13 @@ function summarize(stations, payloadUpdatedAt, isSnapshot) {
     availableBikes += station.available;
     if (station.available === 0) {
       zeroBikeStations += 1;
+      zeroStations.push(station);
       zeroByDistrict.set(station.district, (zeroByDistrict.get(station.district) || 0) + 1);
     }
+  });
+
+  zeroStations.sort(function (a, b) {
+    return a.district.localeCompare(b.district, "zh-Hant") || a.name.localeCompare(b.name, "zh-Hant");
   });
 
   const topZeroDistricts = Array.from(zeroByDistrict, function ([district, count]) {
@@ -53,6 +62,8 @@ function summarize(stations, payloadUpdatedAt, isSnapshot) {
     totalDocks,
     availableBikes,
     zeroBikeStations,
+    /* [Jerry 新增：供右側可捲動面板列出全部零車站名稱與地址] */
+    zeroStations,
     topZeroDistricts: topZeroDistricts.map(function (row) {
       return {
         ...row,

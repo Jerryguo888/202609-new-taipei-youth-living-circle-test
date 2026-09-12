@@ -418,6 +418,32 @@
       color: #171a18;
     }
 
+    button.youbike-stat-card {
+      width: 100%;
+      border: 0;
+      appearance: none;
+      font: inherit;
+      text-align: left;
+    }
+
+    .youbike-stat-card.is-action {
+      cursor: pointer;
+      transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+    }
+
+    .youbike-stat-card.is-action:hover {
+      z-index: 2;
+      transform: translateY(-2px);
+      background: #f7f8f6;
+      box-shadow: 0 14px 32px rgba(0,0,0,.18);
+    }
+
+    .youbike-stat-card.is-action:focus-visible {
+      z-index: 2;
+      outline: 3px solid #f4bf22;
+      outline-offset: 3px;
+    }
+
     .youbike-stat-card::after {
       position: absolute;
       right: -22px;
@@ -449,7 +475,7 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .youbike-stat-card > span {
+    .youbike-stat-unit {
       position: relative;
       z-index: 1;
       margin-left: 7px;
@@ -457,6 +483,18 @@
       font-size: .72rem;
       font-weight: 700;
     }
+
+    .youbike-stat-open-hint {
+      position: absolute;
+      z-index: 2;
+      right: 20px;
+      bottom: 16px;
+      color: #a34834;
+      font-size: .66rem;
+      font-weight: 800;
+    }
+
+    .youbike-stat-open-hint b { margin-left: 4px; font-size: .8rem; }
 
     .youbike-stat-grid.is-loading .youbike-stat-card {
       background: linear-gradient(105deg, #e4e7e3 22%, #f1f3f0 38%, #e4e7e3 56%);
@@ -567,6 +605,187 @@
     @keyframes youbike-loading {
       to { background-position: -220% 0; }
     }
+
+    /* ===== [Jerry 新增：無車可借場站右側清單開始] =====
+       預設保持窄版貼齊右側；使用者按「放大」才擴成寬版。清單本身獨立捲動，
+       外框只用 1px，避免面板看起來太厚重。 */
+    body.has-youbike-zero-panel { overflow: hidden; }
+
+    .youbike-zero-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 3200;
+      display: flex;
+      justify-content: flex-end;
+      background: rgba(3, 7, 9, .56);
+      backdrop-filter: blur(3px);
+    }
+
+    .youbike-zero-panel {
+      display: flex;
+      width: min(410px, calc(100vw - 12px));
+      height: calc(100dvh - 20px);
+      min-height: 0;
+      margin: 10px 0 10px auto;
+      overflow: hidden;
+      flex-direction: column;
+      border: 1px solid rgba(255,255,255,.13);
+      border-right: 0;
+      border-radius: 22px 0 0 22px;
+      outline: 0;
+      background: #11161b;
+      color: #f4f7f5;
+      box-shadow: -20px 0 60px rgba(0,0,0,.38);
+      transition: width .24s ease;
+    }
+
+    .youbike-zero-panel.is-expanded { width: min(760px, calc(100vw - 12px)); }
+
+    .youbike-zero-panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 18px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+    }
+
+    .youbike-zero-panel-head p {
+      margin: 0 0 5px;
+      color: #8fa099;
+      font-size: .64rem;
+      font-weight: 780;
+      letter-spacing: .1em;
+    }
+
+    .youbike-zero-panel-head h2 { margin: 0; font-size: 1.3rem; letter-spacing: -.03em; }
+
+    .youbike-zero-panel-actions { display: flex; flex: 0 0 auto; gap: 7px; }
+
+    .youbike-zero-panel-actions button {
+      min-height: 32px;
+      padding: 0 11px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      background: #242a2d;
+      color: #dce4df;
+      font-size: .68rem;
+      font-weight: 760;
+    }
+
+    .youbike-zero-panel-actions button:hover { background: #30383a; }
+    .youbike-zero-panel-actions button.is-close { background: #e9efec; color: #18201e; }
+
+    .youbike-zero-panel-tools {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+    }
+
+    .youbike-zero-panel-tools label {
+      display: block;
+      margin-bottom: 7px;
+      color: #aebcb7;
+      font-size: .7rem;
+      font-weight: 720;
+    }
+
+    .youbike-zero-panel-tools input {
+      width: 100%;
+      min-height: 40px;
+      padding: 0 12px;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 10px;
+      outline: 0;
+      background: #20262a;
+      color: #f4f7f5;
+    }
+
+    .youbike-zero-panel-tools input:focus { border-color: #55e6cf; }
+    .youbike-zero-panel-tools input::placeholder { color: #76847e; }
+
+    .youbike-zero-panel-tools p {
+      margin: 8px 1px 0;
+      color: #82908a;
+      font-size: .65rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-zero-station-list {
+      display: grid;
+      min-height: 0;
+      margin: 0;
+      padding: 8px 12px 18px;
+      overflow-y: auto;
+      align-content: start;
+      gap: 6px;
+      list-style: none;
+      scrollbar-width: thin;
+      scrollbar-color: #46524d transparent;
+    }
+
+    .youbike-zero-station-list li {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 9px;
+      padding: 12px 10px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      background: #181e22;
+    }
+
+    .youbike-zero-station-index {
+      padding-top: 2px;
+      color: #6f7e77;
+      font-size: .62rem;
+      font-weight: 760;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .youbike-zero-station-list li p {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .youbike-zero-station-list li p b {
+      flex: 0 0 auto;
+      color: #55e6cf;
+      font-size: .68rem;
+    }
+
+    .youbike-zero-station-list li p strong {
+      min-width: 0;
+      overflow: hidden;
+      color: #f4f7f5;
+      font-size: .78rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .youbike-zero-station-list address {
+      margin-top: 5px;
+      color: #96a49e;
+      font-size: .68rem;
+      font-style: normal;
+      line-height: 1.5;
+    }
+
+    .youbike-zero-no-result {
+      margin: auto;
+      color: #899690;
+      font-size: .78rem;
+    }
+
+    .youbike-panel-enter-active,
+    .youbike-panel-leave-active { transition: opacity .2s ease; }
+    .youbike-panel-enter-active .youbike-zero-panel,
+    .youbike-panel-leave-active .youbike-zero-panel { transition: transform .22s ease, width .24s ease; }
+    .youbike-panel-enter-from,
+    .youbike-panel-leave-to { opacity: 0; }
+    .youbike-panel-enter-from .youbike-zero-panel,
+    .youbike-panel-leave-to .youbike-zero-panel { transform: translateX(100%); }
+    /* ===== [Jerry 新增：無車可借場站右側清單結束] ===== */
     /* ===== [Jerry 新增：YouBike 公共資源面板結束] ===== */
 
     /* ===== [本次改版：資源缺口頁只剩托育一張稀缺率疊圖（學校／停車已刪除），
@@ -1115,8 +1334,15 @@
       .youbike-stat-card { min-height: 118px; padding: 16px 14px; border-radius: 19px; }
       .youbike-stat-card p { margin-bottom: 17px; }
       .youbike-stat-card strong { font-size: clamp(1.65rem, 9vw, 2.35rem); }
-      .youbike-stat-card > span { display: block; margin: 7px 0 0; }
+      .youbike-stat-unit { display: block; margin: 7px 0 0; }
+      .youbike-stat-open-hint { right: 12px; bottom: 10px; font-size: .6rem; }
       .youbike-ranking-card { margin-top: 9px; padding: 18px 14px; border-radius: 19px; }
       .youbike-ranking-head { align-items: flex-start; flex-direction: column; gap: 9px; }
       .youbike-ranking-list li { grid-template-columns: 22px 54px minmax(60px, 1fr) 48px; gap: 7px; }
+      .youbike-zero-panel { width: calc(100vw - 8px); height: calc(100dvh - 8px); margin: 4px 0 4px auto; border-radius: 18px 0 0 18px; }
+      .youbike-zero-panel.is-expanded { width: calc(100vw - 8px); }
+      .youbike-zero-panel-head { padding: 16px 12px 13px; }
+      .youbike-zero-panel-head h2 { font-size: 1.05rem; }
+      .youbike-zero-panel-tools { padding: 12px; }
+      .youbike-zero-station-list { padding: 7px 8px 12px; }
     }
