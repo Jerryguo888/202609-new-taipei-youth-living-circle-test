@@ -18,6 +18,23 @@ function handleSend() {
   appState.sendChat(messagesEl.value);
 }
 
+/* [2026-09-12 修正：中文輸入法下訊息會被提前送出。
+   用 IME 打字時 Enter 是「確認候選字」，此時 keydown 仍然會觸發，而 Vue 的
+   .exact 修飾詞只檢查 Ctrl/Shift 之類的輔助鍵，不會過濾組字狀態。結果是使用者
+   打幾個字按 Enter 選字，訊息就被送出、輸入框被清空，看起來像「只能輸入幾個字」。
+   keyCode === 229 是備援：部分 Android IME 與舊版 Safari 不會給正確的
+   isComposing，但會回報這個代表「組字中」的鍵碼。 */
+function onEnter(event) {
+  if (event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  handleSend();
+}
+
+/* 打字動畫進行中時點一下訊息就直接看全文，不必等它慢慢打完。 */
+function revealMessage(message) {
+  appState.revealMessageNow(message);
+}
+
 function closeChat() {
   closePlanChart(false);
   appState.chatOpen = false;
@@ -102,7 +119,15 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
                    :src="message.role === 'user' ? userAvatar : aiAvatar" alt="">
               <div class="chat-message-content">
                 <small class="chat-message-name">{{ message.role === "user" ? "USER" : "生活圈 AI 助理" }}</small>
-                <div class="message" :class="{ user: message.role === 'user' }">
+                <!-- [2026-09-12 改版：回覆改成收完才顯示，並用打字動畫呈現。
+                     動畫期間點一下氣泡就直接看全文，不必等它打完。 -->
+                <div class="message" :class="{ user: message.role === 'user', 'is-typing': message.typing }"
+                     :role="message.typing ? 'button' : null"
+                     :tabindex="message.typing ? 0 : null"
+                     :aria-label="message.typing ? '正在逐字顯示，點擊立即顯示全文' : null"
+                     @click="message.typing && revealMessage(message)"
+                     @keydown.enter.prevent="message.typing && revealMessage(message)"
+                     @keydown.space.prevent="message.typing && revealMessage(message)">
                   <!-- 只有明確標記為 assistant 的回覆才解析 Markdown，且解析結果會先經
                        DOMPurify 白名單消毒。user 與其他未知 role 一律走 {{ }} 純文字轉義。 -->
                   <div v-if="message.role === 'assistant' && message.text"
@@ -154,8 +179,10 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
                 <div class="message typing-message">
                   <div class="typing-status">
                     <!-- [2026-09-12 改版：AI 會先自己去查資料再回答，那段等待比單純
-                         生成長。顯示它正在讀什麼，等待才不像沒反應。] -->
-                    <span class="typing-label">{{ appState.chatActivity || "回覆中" }}</span>
+                         生成長。顯示它正在讀什麼，等待才不像沒反應。
+                         回覆改成收完才顯示之後，這段等待涵蓋整個生成過程，
+                         這行字是使用者唯一的進度資訊。] -->
+                    <span class="typing-label">{{ appState.chatActivity || "思考中" }}</span>
                     <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
                   </div>
                 </div>
@@ -166,7 +193,7 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
 
         <footer class="chat-compose-area">
           <div class="chat-input">
-            <input ref="chatInputEl" v-model="appState.chatInput" @keydown.enter.exact.prevent="handleSend"
+            <input ref="chatInputEl" v-model="appState.chatInput" @keydown.enter="onEnter"
                    aria-label="輸入問題" placeholder="問選址、30 分鐘覆蓋或預算配置…">
             <button type="button" class="chat-send" :disabled="appState.chatLoading"
                     @click="handleSend" aria-label="送出訊息">

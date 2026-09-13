@@ -7,3 +7,4 @@ dist/
 !.env.example
 .claude
 .kiro
+__pycache__

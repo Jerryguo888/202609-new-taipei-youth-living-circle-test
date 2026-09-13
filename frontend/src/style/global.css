@@ -2401,12 +2401,43 @@
       30% { transform: translateY(-7px); opacity: 1; }
     }
 
+    /* [2026-09-12 新增：回覆改成收完才用打字動畫呈現。
+       游標接在最後一個字後面，讓人看得出還沒打完。用 ::after 而不是插入真的
+       元素，是為了不動到 v-html 產生的 DOM。 */
+    .message.is-typing { cursor: pointer; }
+    .message.is-typing .message-markdown > :last-child::after,
+    .message.is-typing > p:last-of-type::after {
+      content: "";
+      display: inline-block;
+      width: .5em;
+      height: 1em;
+      margin-left: 2px;
+      border-radius: 1px;
+      background: var(--forest);
+      vertical-align: text-bottom;
+      animation: chat-caret-blink 1s steps(2, start) infinite;
+    }
+    @keyframes chat-caret-blink {
+      to { visibility: hidden; }
+    }
+
+    /* 圖表等打字打完才出現，淡入避免突然跳出來。 */
+    .ai-chart-wrap { animation: chat-chart-in .28s ease-out both; }
+    @keyframes chat-chart-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .chart-modal-enter-active,
       .chart-modal-leave-active,
       .chart-modal-enter-active .chat-chart-modal,
       .chart-modal-leave-active .chat-chart-modal { transition: none; }
       .typing-dots i { animation: none; opacity: .72; }
+      /* 關掉動畫效果時 typewriter.js 會直接給全文，游標也不該閃。 */
+      .message.is-typing .message-markdown > :last-child::after,
+      .message.is-typing > p:last-of-type::after { animation: none; }
+      .ai-chart-wrap { animation: none; }
     }
 
     @media (max-width: 760px) {

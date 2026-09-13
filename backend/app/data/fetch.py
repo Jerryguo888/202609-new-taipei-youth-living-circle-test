@@ -324,4 +324,23 @@ def fetch_all(
         log(f"寫出 {path}（{len(records)} 筆）{delta}")
 
     log(f"更新了 {len(written)} 個表，{len(problems)} 個問題")
+
+    # 抓完就推上 S3，讓 Athena 看到的資料跟本機檔案是同一批。分兩個步驟做的話，
+    # 中間那段時間 Athena 查到的是上個月的數字，而畫面上不會有任何提示。
+    if written and config.LAKE_SYNC_ON_REFRESH and config.S3_DATA_BUCKET:
+        from app.data import lake
+
+        log("推送到 S3 資料湖")
+        try:
+            summary = lake.sync(log=log)
+            problems.extend(summary["skipped"])
+        except Exception as error:  # noqa: BLE001
+            # 上傳失敗不該讓整個更新算失敗：本機檔案已經寫好，網站照樣是新資料，
+            # 只有 Athena 那條路會落後。
+            logger.exception("lake sync failed")
+            problems.append(f"S3 上傳失敗（本機資料已更新）：{error}")
+            log(f"  失敗：{error}")
+    elif written and config.LAKE_SYNC_ON_REFRESH:
+        log("未設定 S3_DATA_BUCKET，跳過資料湖上傳")
+
     return {"written": written, "problems": problems, "counts": counts}

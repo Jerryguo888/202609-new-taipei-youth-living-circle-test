@@ -1,10 +1,18 @@
-"""/api/chat —— 帶工具迴圈的 SSE 串流對話。
+"""/api/chat —— 帶工具迴圈的對話，用 SSE 傳事件。
 
 這裡的核心是 tool-use 迴圈：模型可以在一次回答裡多次呼叫工具（先查排名、
 再撈名冊），我們把每一輪的結果餵回去，直到它不再要求工具為止。
 
 `MAX_TOOL_ROUNDS` 是硬性上限。沒有上限的話，模型偶爾會反覆查同一件事，
 既拖時間也燒 token，而使用者只會看到一個一直不動的氣泡。
+
+**文字不逐 token 送**：模型的輸出全部收完才用一個 `text` 事件送出，由前端跑
+打字機動畫呈現。這樣做的取捨是——逐字串流看起來比較快，但模型在工具往返之間
+會吐出「讓我查一下…」這類過程話語，逐字顯示會讓畫面一直改寫已經出現的內容，
+讀起來很亂。收完再送，前端拿到的是定稿。
+
+仍然保留 SSE 而不是改成單一 JSON 回應，是為了 `tool` 事件：那是使用者在最長
+可達數十秒的等待中，唯一能知道「AI 正在讀哪份資料」的訊息。
 """
 
 from __future__ import annotations
@@ -59,15 +67,19 @@ def chat(request: ChatRequest):
         # 累積這次回答總共讀了哪些資料，回傳給前端顯示來源
         used_tools: list[dict] = []
         kb_sources: list[dict] = []
+        # 只留最後一輪的文字。前面幾輪的文字是模型在呼叫工具前的過程話語
+        # （「我先查一下各區人口」），那不是答案，混進最終回覆只會讓人困惑。
+        answer_parts: list[str] = []
 
         try:
             for round_index in range(config.MAX_TOOL_ROUNDS + 1):
                 stop_payload = None
                 tool_requests: list[dict] = []
 
+                round_text: list[str] = []
                 for kind, payload in stream_one_turn(working, system_prompt, tool_specs):
                     if kind == "text":
-                        yield sse({"text": payload})
+                        round_text.append(payload)
                     elif kind == "tool_use":
                         tool_requests.append(payload)
                         summary = summarise_for_ui(payload["name"], payload["input"])
@@ -78,10 +90,14 @@ def chat(request: ChatRequest):
                         stop_payload = payload
 
                 if not tool_requests or stop_payload is None:
+                    # 這一輪沒有再要工具，代表它就是答案。
+                    answer_parts.append("".join(round_text))
                     break
 
                 if round_index >= config.MAX_TOOL_ROUNDS:
+                    # 撞到上限時保留它已經說出來的話，不要整段丟掉。
                     logger.warning("tool round limit reached (%s)", config.MAX_TOOL_ROUNDS)
+                    answer_parts.append("".join(round_text))
                     yield sse(
                         {"error": f"查詢次數超過上限（{config.MAX_TOOL_ROUNDS} 輪），已中止。"}
                     )
@@ -112,6 +128,12 @@ def chat(request: ChatRequest):
                         }
                     )
                 working.append({"role": "user", "content": tool_results})
+
+            # 定稿一次送出。要放在 sources／tools_used 之前，前端才能先把訊息
+            # 建出來、開始跑打字動畫，再把來源掛上去。
+            answer = "".join(answer_parts).strip()
+            if answer:
+                yield sse({"text": answer})
 
             if kb_sources:
                 # 去重後才送，同一份文件可能被多個片段命中

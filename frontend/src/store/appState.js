@@ -28,6 +28,7 @@ import {
 import { localChatReply, getChatReply as getChatReplyService } from "../lib/chatService.js";
 /* [2026-09-12 新增：模型會輸出圖表 HTML，一律先經過 chartHtml.js 消毒。] */
 import { splitChartBlocks } from "../lib/chartHtml.js";
+import { typewrite } from "../lib/typewriter.js";
 import { estimateChildcareGapRows } from "../lib/resourceGaps.js";
 import { estimateTransitGapRows } from "../lib/transitGap.js";
 import { loadYouthSuicideShareRows } from "../lib/mortalityStats.js";
@@ -38,6 +39,22 @@ const EMPTY_METRICS = { stops: "—", routes: "—", distance: "—", wait: "—
 function scrollChatToBottom(messagesEl) {
   if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
 }
+
+/* 打字動畫會持續好幾秒，這段期間無條件捲到底會跟「使用者往上滾看前文」打架。
+   只有本來就貼在底部附近時才跟著捲。 */
+const STICKY_SCROLL_SLACK_PX = 120;
+function scrollChatToBottomIfNear(messagesEl) {
+  if (!messagesEl) return;
+  const distanceFromBottom =
+    messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+  if (distanceFromBottom <= STICKY_SCROLL_SLACK_PX) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+}
+
+/* 同一時間只會有一則訊息在打字。留在模組層是因為它不該進 reactive()：
+   控制器是命令式的，放進 reactive 會被 Proxy 包起來，比較身分時容易出錯。 */
+let activeTypewriter = null;
 
 /* [本次改版：3D人口／30分鐘交通／預算模擬／青年熱區各自的獨立分頁都拿掉了，
    青年熱區排行、圖例、交通分析三塊改整合進「整合地圖」左側面板，共用同一份
@@ -420,39 +437,15 @@ export const appState = reactive({
     await nextTick();
     scrollChatToBottom(messagesEl);
 
-    /* [Jerry 改版保留：最短載入時間避免氣泡一閃而過。
-       [2026-09-12 改版：真的有串流時就不需要這個保護，第一個 token 一到就
-       直接把跳動氣泡換成逐字增長的回覆；只有本機回覆或失敗才補足時間。] */
+    /* [Jerry 改版保留：最短載入時間避免氣泡一閃而過。] */
     const loadingStartedAt = Date.now();
     const minimumLoadingTime = 560;
     const store = this;
-    let streamingMessage = null;
 
-    /* 模型每選一份資料就更新狀態字串。這時還沒有任何文字，
-       所以維持 chatLoading，只是把氣泡裡的字換掉。 */
+    /* 模型每選一份資料就更新狀態字串。這段期間還沒有任何文字，
+       所以維持 chatLoading，只是把「思考中」換成它正在讀什麼。 */
     function handleTool(tool) {
       store.chatActivity = tool && tool.summary ? tool.summary : "查詢資料";
-      nextTick(function () { scrollChatToBottom(messagesEl); });
-    }
-
-    function handleDelta(delta, full) {
-      if (!streamingMessage) {
-        store.chatLoading = false;
-        store.chatActivity = "";
-        streamingMessage = { role: "assistant", text: "", sources: [], charts: [], tools: [] };
-        store.chatMessages.push(streamingMessage);
-      }
-      /* 沒有圍籬符號時走快速路徑，不必每個 token 都重跑圖表消毒；
-         assistant 文字會在 ChatWidget 渲染時由 assistantMarkdown.js 統一消毒。 */
-      if (full.indexOf("```") === -1) {
-        streamingMessage.text = full;
-      } else {
-        /* 已收尾的圖表邊串邊畫，還沒收尾的用提示文字代替，
-           使用者才不會看到一堆生 HTML 標記。 */
-        const partial = splitChartBlocks(full, true);
-        streamingMessage.text = partial.text;
-        streamingMessage.charts = partial.charts;
-      }
       nextTick(function () { scrollChatToBottom(messagesEl); });
     }
 
@@ -460,7 +453,6 @@ export const appState = reactive({
     try {
       reply = await this.getChatReply(text, {
         history: history,
-        onDelta: handleDelta,
         onTool: handleTool,
       });
     } catch (error) {
@@ -474,40 +466,79 @@ export const appState = reactive({
 
     this.chatActivity = "";
 
-    if (streamingMessage) {
-      this.chatLoading = false;
-      streamingMessage.tools = reply.tools || [];
-      const finalText = reply.text || streamingMessage.text;
-      /* 收尾後重跑一次（streaming=false），把「正在繪製圖表…」的提示換成真的圖表。 */
-      const done = splitChartBlocks(finalText, false);
-      streamingMessage.charts = done.charts;
-      /* 只有圖表沒有文字是合法的；真的兩者都空才退回顯示原文，
-         免得回覆整段消失。 */
-      streamingMessage.text = done.text || (done.charts.length ? "" : finalText);
-      streamingMessage.sources = reply.sources || [];
-      if (reply.partialError) {
-        streamingMessage.text += "\n\n（回覆中斷：" + reply.partialError + "）";
-      }
-    } else {
-      const loadingTimeLeft = minimumLoadingTime - (Date.now() - loadingStartedAt);
-      if (loadingTimeLeft > 0) {
-        await new Promise(function (resolve) { setTimeout(resolve, loadingTimeLeft); });
-      }
-      this.chatLoading = false;
-      let body = reply.text;
-      if (reply.notice) body += "\n\n（" + reply.notice + "，以上為本機情境回覆）";
-      const done = splitChartBlocks(body, false);
-      this.chatMessages.push({
-        role: "assistant",
-        text: done.text || (done.charts.length ? "" : body),
-        charts: done.charts,
-        sources: reply.sources || [],
-        tools: reply.tools || [],
-      });
+    /* 氣泡一閃而過會看不清楚，補足最短載入時間。逐字串流的年代不需要這個
+       （第一個 token 一到就有東西看），改成收完才顯示之後又用得上了。 */
+    const loadingTimeLeft = minimumLoadingTime - (Date.now() - loadingStartedAt);
+    if (loadingTimeLeft > 0) {
+      await new Promise(function (resolve) { setTimeout(resolve, loadingTimeLeft); });
     }
+    this.chatLoading = false;
+
+    let body = reply.text || "";
+    if (reply.notice) body += "\n\n（" + reply.notice + "，以上為本機情境回覆）";
+    if (reply.partialError) body += "\n\n（回覆中斷：" + reply.partialError + "）";
+
+    const done = splitChartBlocks(body);
+    /* 只有圖表沒有文字是合法的；真的兩者都空才退回顯示原文，
+       免得回覆整段消失。 */
+    const finalText = done.text || (done.charts.length ? "" : body);
+
+    /* charts 先留空、typing 標記為 true：圖表等打字打完才淡入，
+       否則圖表先出現、文字還在打，閱讀順序會反過來。 */
+    this.chatMessages.push({
+      role: "assistant",
+      text: "",
+      fullText: finalText,
+      charts: [],
+      pendingCharts: done.charts,
+      sources: reply.sources || [],
+      tools: reply.tools || [],
+      typing: true,
+    });
+    /* 一定要用陣列取回的那一份來跑動畫，不能沿用剛才 push 進去的字面物件。
+       reactive() 是 Proxy：push 存進去的是原始物件，透過原始參照改屬性不會經過
+       set trap，Vue 收不到通知。症狀是「回覆其實已經到了，但要點一下畫面才顯示」
+       —— 因為任何其他互動引發的重繪，才會重新讀到新值。 */
+    const message = this.chatMessages[this.chatMessages.length - 1];
 
     await nextTick();
     scrollChatToBottom(messagesEl);
+
+    this._runTypewriter(message, messagesEl);
+  },
+
+  /* 打字機動畫。抽成 method 是為了讓「點一下跳過」可以拿到同一個控制器。 */
+  _runTypewriter(message, messagesEl) {
+    if (activeTypewriter) activeTypewriter.cancel();
+
+    activeTypewriter = typewrite(message.fullText, {
+      onReveal: function (partial) {
+        message.text = partial;
+        /* 動畫期間持續往下捲，但使用者自己往上滾看前文時就不要搶捲軸。 */
+        nextTick(function () { scrollChatToBottomIfNear(messagesEl); });
+      },
+      onDone: function () {
+        message.typing = false;
+        message.charts = message.pendingCharts || [];
+        message.pendingCharts = [];
+        activeTypewriter = null;
+        nextTick(function () { scrollChatToBottomIfNear(messagesEl); });
+      },
+    });
+  },
+
+  /* 使用者點了正在打字的訊息：立刻顯示全文。 */
+  revealMessageNow(message) {
+    if (!message || !message.typing) return;
+    if (activeTypewriter) {
+      activeTypewriter.finish();
+      return;
+    }
+    /* 控制器已經不見了（例如熱重載）也要能收尾，不然訊息會永遠停在半截。 */
+    message.text = message.fullText || message.text;
+    message.typing = false;
+    message.charts = message.pendingCharts || [];
+    message.pendingCharts = [];
   },
 });
 
