@@ -485,7 +485,7 @@ export const appState = reactive({
 
     /* charts 先留空、typing 標記為 true：圖表等打字打完才淡入，
        否則圖表先出現、文字還在打，閱讀順序會反過來。 */
-    const message = {
+    this.chatMessages.push({
       role: "assistant",
       text: "",
       fullText: finalText,
@@ -494,8 +494,13 @@ export const appState = reactive({
       sources: reply.sources || [],
       tools: reply.tools || [],
       typing: true,
-    };
-    this.chatMessages.push(message);
+    });
+    /* 一定要用陣列取回的那一份來跑動畫，不能沿用剛才 push 進去的字面物件。
+       reactive() 是 Proxy：push 存進去的是原始物件，透過原始參照改屬性不會經過
+       set trap，Vue 收不到通知。症狀是「回覆其實已經到了，但要點一下畫面才顯示」
+       —— 因為任何其他互動引發的重繪，才會重新讀到新值。 */
+    const message = this.chatMessages[this.chatMessages.length - 1];
+
     await nextTick();
     scrollChatToBottom(messagesEl);
 
