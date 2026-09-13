@@ -73,6 +73,12 @@ services:
       ATHENA_WORKGROUP: ${ATHENA_WORKGROUP:-primary}
       ATHENA_OUTPUT_LOCATION: ${ATHENA_OUTPUT_LOCATION:-}
       ATHENA_TIMEOUT_SECONDS: ${ATHENA_TIMEOUT_SECONDS:-20}
+      # S3 資料湖：Athena 查的就是這裡。留空則整個資料湖功能停用（後台的手動
+      # 更新仍然照常寫本機 volume），所以沒設定不會壞掉。
+      # 注意這跟 KB_BUCKET 是兩個不同的 bucket，見 backend/data_sources.yaml 的說明。
+      S3_DATA_BUCKET: ${S3_DATA_BUCKET:-}
+      S3_CURATED_PREFIX: ${S3_CURATED_PREFIX:-curated/}
+      LAKE_SYNC_ON_REFRESH: ${LAKE_SYNC_ON_REFRESH:-true}
       # 名冊優先讀這裡（每月更新寫入的 volume）；找不到才退回 image 內建版本
       RECORDS_DIR: /data/records
       # ---- 後台（帳號、知識庫檔案上傳、手動更新）----
@@ -115,6 +121,12 @@ services:
       # 抓到 0 筆、或筆數掉超過一半時保留舊檔不覆蓋，
       # 避免上游出問題時把名冊清空
       FETCH_MAX_SHRINK: ${FETCH_MAX_SHRINK:-0.5}
+      # 抓完直接推上 S3，讓 Athena 看到的跟本機檔案是同一批。分兩次做的話，
+      # 中間那段時間 Athena 查到的是上個月的數字，而畫面上不會有任何提示。
+      AWS_REGION: ${AWS_REGION:-us-west-2}
+      S3_DATA_BUCKET: ${S3_DATA_BUCKET:-}
+      S3_CURATED_PREFIX: ${S3_CURATED_PREFIX:-curated/}
+      LAKE_SYNC_ON_REFRESH: ${LAKE_SYNC_ON_REFRESH:-true}
     volumes:
       - living-circle-data:/data
     # 需要寫入，所以不能沿用 chat 的 read-only 掛載

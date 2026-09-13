@@ -87,6 +87,16 @@ DATA_SOURCES_PATH = env_path("DATA_SOURCES_PATH", PROJECT_ROOT / "data_sources.y
 FETCH_MAX_SHRINK = float(env_str("FETCH_MAX_SHRINK", "0.5"))
 
 # --------------------------------------------------------------------------
+# S3 資料湖（Athena 的來源）
+# --------------------------------------------------------------------------
+# 刻意跟 KB_BUCKET 分開。KB 那個 bucket 掛在知識庫上，任何丟進去的檔案都會被
+# 吸進向量庫；把 Athena 用的資料寫進去，AI 檢索時就會撈到自己的原始資料表。
+S3_DATA_BUCKET = env_str("S3_DATA_BUCKET", "")
+S3_CURATED_PREFIX = env_str("S3_CURATED_PREFIX", "curated/").strip("/")
+# 每月抓完資料後要不要自動推上 S3。沒設 bucket 時這個開關無效。
+LAKE_SYNC_ON_REFRESH = env_bool("LAKE_SYNC_ON_REFRESH", True)
+
+# --------------------------------------------------------------------------
 # 指標後端
 # --------------------------------------------------------------------------
 METRIC_BACKEND = env_str("METRIC_BACKEND", "local").lower()
