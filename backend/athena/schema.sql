@@ -6,7 +6,13 @@
 --
 -- 執行前先把 __BUCKET__ 換成你的資料湖 bucket 名稱：
 --   sed 's/__BUCKET__/ntpc-youth-datalake/g' backend/athena/schema.sql
--- 然後整份貼進 Athena 查詢編輯器執行（可一次執行多個敘述）。
+--
+-- **Athena 的 Query editor 一次只接受一個敘述**（整份貼進去會得到
+-- "Only one sql statement is allowed"）。所以要嘛一段一段貼，要嘛用
+-- backend/athena/apply_athena_schema.sh 透過 CLI 依序送出。
+--
+-- 第一次建立時 DROP TABLE 那幾行可以跳過（表還不存在）。重建時才需要，
+-- 而且必須在 CREATE 之前先 DROP —— 改過欄位定義後直接 CREATE 會失敗。
 --
 -- 格式是 JSONL（一行一個 JSON 物件），不是一般的 JSON 陣列。用
 -- org.openx.data.jsonserde.JsonSerDe 而不是 Hive 內建的，因為它支援
