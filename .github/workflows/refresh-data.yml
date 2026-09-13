@@ -37,6 +37,13 @@ jobs:
     timeout-minutes: 20
     env:
       FETCH_MAX_SHRINK: ${{ inputs.max_shrink || '0.5' }}
+      # 這幾個是給 compose 的 refresh 服務用的。少了 S3_DATA_BUCKET，抓取會
+      # 正常完成、本機資料也會更新，但會跳過 S3 上傳 —— 結果是網站看到新數字、
+      # Athena 還在回上個月的，而且兩邊都不會報錯。
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+      S3_DATA_BUCKET: ${{ vars.S3_DATA_BUCKET }}
+      S3_CURATED_PREFIX: ${{ vars.S3_CURATED_PREFIX || 'curated/' }}
+      LAKE_SYNC_ON_REFRESH: ${{ vars.LAKE_SYNC_ON_REFRESH || 'true' }}
 
     steps:
       - name: Show current data freshness
@@ -57,7 +64,24 @@ jobs:
           cd "$DEPLOY_DIR"
           # --rm so the one-shot container does not accumulate.
           # The refresh service shares the named volume that chat reads from.
-          docker compose run --rm refresh
+          # tee so the next step can check whether the S3 upload actually ran.
+          docker compose run --rm refresh 2>&1 | tee /tmp/refresh.log
+
+      - name: Check the data lake upload
+        # 抓取成功但沒推上 S3 是最難察覺的失敗模式：網站顯示新資料，Athena 卻
+        # 還在回上個月的數字，而兩邊都不會報錯。所以這裡明確判斷一次。
+        run: |
+          set -euo pipefail
+          if grep -q "未設定 S3_DATA_BUCKET" /tmp/refresh.log; then
+            echo "::warning::Records were refreshed locally but not uploaded to S3, because S3_DATA_BUCKET is unset. If METRIC_BACKEND=athena, Athena will keep answering with last month's data. Set an S3_DATA_BUCKET repo variable."
+          elif grep -q "S3 上傳失敗" /tmp/refresh.log; then
+            echo "::error::The S3 upload failed, so Athena still holds the previous data. Local records were updated, so the site is fine. Check the instance role has s3:PutObject on the data lake bucket."
+            grep "S3 上傳失敗" /tmp/refresh.log >&2
+            exit 1
+          elif grep -q "上傳 s3://" /tmp/refresh.log; then
+            echo "Uploaded to the data lake:"
+            grep "上傳 s3://" /tmp/refresh.log | sed 's/^/  /'
+          fi
 
       - name: Confirm the running container picked up the new data
         run: |

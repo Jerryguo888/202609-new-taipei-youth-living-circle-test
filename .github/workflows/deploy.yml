@@ -48,6 +48,12 @@ jobs:
       # Required by Athena; a query is rejected outright without a result location.
       ATHENA_OUTPUT_LOCATION: ${{ vars.ATHENA_OUTPUT_LOCATION }}
       ATHENA_TIMEOUT_SECONDS: ${{ vars.ATHENA_TIMEOUT_SECONDS || '20' }}
+      # S3 data lake: what Athena actually reads. The admin console's manual
+      # refresh uploads through the chat container, so it needs these too.
+      # Deliberately separate from KB_BUCKET — see backend/data_sources.yaml.
+      S3_DATA_BUCKET: ${{ vars.S3_DATA_BUCKET }}
+      S3_CURATED_PREFIX: ${{ vars.S3_CURATED_PREFIX || 'curated/' }}
+      LAKE_SYNC_ON_REFRESH: ${{ vars.LAKE_SYNC_ON_REFRESH || 'true' }}
 
     steps:
       - name: Warn on missing CARTO key
