@@ -15,7 +15,21 @@ const planChartKey = ref("");
 let planChartTrigger = null;
 
 function handleSend() {
-  appState.sendChat(messagesEl.value);
+  const pendingReply = appState.sendChat(messagesEl.value);
+  nextTick(resizeChatInput);
+  return pendingReply;
+}
+
+/* [Jerry 2026-09-13 新增：輸入框依內容自動長高，最多顯示 5 行。
+   超過上限後保留固定高度並啟用內部捲軸，瀏覽器會自動讓目前游標所在行可見。] */
+function resizeChatInput() {
+  const input = chatInputEl.value;
+  if (!input) return;
+
+  input.style.height = "auto";
+  const maxHeight = Number.parseFloat(window.getComputedStyle(input).maxHeight) || 140;
+  input.style.height = Math.min(input.scrollHeight, maxHeight) + "px";
+  input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
 /* [2026-09-12 修正：中文輸入法下訊息會被提前送出。
@@ -26,6 +40,7 @@ function handleSend() {
    isComposing，但會回報這個代表「組字中」的鍵碼。 */
 function onEnter(event) {
   if (event.isComposing || event.keyCode === 229) return;
+  if (event.shiftKey) return;
   event.preventDefault();
   handleSend();
 }
@@ -90,6 +105,7 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
   await nextTick();
   chatPanelEl.value?.focus();
   chatInputEl.value?.focus();
+  resizeChatInput();
   if (messagesEl.value) messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
 });
 </script>
@@ -193,8 +209,10 @@ watch(function () { return appState.chatOpen; }, async function (isOpen) {
 
         <footer class="chat-compose-area">
           <div class="chat-input">
-            <input ref="chatInputEl" v-model="appState.chatInput" @keydown.enter="onEnter"
-                   aria-label="輸入問題" placeholder="問選址、30 分鐘覆蓋或預算配置…">
+            <textarea ref="chatInputEl" v-model="appState.chatInput" rows="1"
+                      @input="resizeChatInput" @keydown.enter="onEnter"
+                      aria-label="輸入問題；Enter 送出，Shift 加 Enter 換行"
+                      placeholder="問選址、30 分鐘覆蓋或預算配置…"></textarea>
             <button type="button" class="chat-send" :disabled="appState.chatLoading"
                     @click="handleSend" aria-label="送出訊息">
               <span aria-hidden="true">➤</span>
