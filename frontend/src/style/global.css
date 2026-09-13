@@ -2267,9 +2267,15 @@
     .chat-tools { border-top-color: rgba(24,87,47,.28); }
     .chat-tools li { word-break: break-word; }
 
-    /* 等待文字會從「回覆中」變成「查詢數值：…」，長度差很多，
-       固定最小寬度避免氣泡在切換時抖動 */
-    .typing-message .typing-label { white-space: nowrap; }
+    /* [Jerry 2026-09-13 修正：查詢狀態可能含 youth_population 之類的長識別碼。
+       不再強迫單行；允許文字在氣泡內縮排與換行，避免撐破右側聊天室。] */
+    .typing-message .typing-label {
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow-wrap: anywhere;
+      word-break: normal;
+      white-space: normal;
+    }
 
     .message.user {
       border-color: transparent;
@@ -2280,12 +2286,17 @@
     }
 
     /* [Jerry 改版：AI 回覆中三點跳動氣泡；chatLoading 之後直接接 AWS 請求生命週期。] */
-    .typing-message { min-width: 120px; }
+    .typing-message {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+    }
 
     .typing-status {
       display: flex;
+      min-width: 0;
       min-height: 24px;
-      align-items: center;
+      align-items: flex-start;
       gap: 10px;
     }
 
@@ -2295,7 +2306,13 @@
       font-weight: 720;
     }
 
-    .typing-dots { display: inline-flex; align-items: center; gap: 5px; }
+    .typing-dots {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 5px;
+      margin-top: .42em;
+    }
 
     .typing-dots i {
       display: block;
