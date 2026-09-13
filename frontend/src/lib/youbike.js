@@ -1,4 +1,5 @@
 import { DATA_FILES } from "./data/dataFiles.js";
+import { describeFreshness, formatSourceStamp, loadLiveRecords } from "./data/liveRecords.js";
 
 /* [Jerry 修正：固定補齊新北29區，沒有零車站點的行政區也必須顯示 0 站。] */
 const NEW_TAIPEI_DISTRICTS = [
@@ -18,26 +19,23 @@ function asNumber(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+/* 同時吃兩種欄位名：
+     sno/sna/sarea/ar/tot_quantity/sbi_quantity/mday  YouBike 官方 API 原始欄位
+     station_id/name/district/address/docks/available/updated  我們正規化後的欄位
+   這樣同一個函式可以處理靜態快照、/live/ 的資料、以及直接打官方 API 三種來源。 */
 function normalizeStation(row) {
   return {
-    id: String(row.sno || row.id || ""),
+    id: String(row.sno || row.station_id || row.id || ""),
     name: String(row.sna || row.name || "未命名場站").replace(/^YouBike2\.0_/, ""),
     district: String(row.sarea || row.district || "未分類"),
     address: String(row.ar || row.address || "地址未提供"),
-    docks: asNumber(row.tot_quantity ?? row.tot ?? row.total),
+    docks: asNumber(row.tot_quantity ?? row.tot ?? row.total ?? row.docks),
     available: asNumber(row.sbi_quantity ?? row.sbi ?? row.available),
-    updatedAt: row.mday || row.updatedAt || "",
+    updatedAt: row.mday || row.updated || row.updatedAt || "",
   };
 }
 
-function parseOfficialTime(value) {
-  const text = String(value || "");
-  const match = text.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})$/);
-  if (!match) return text;
-  return `${match[1]}/${match[2]}/${match[3]} ${match[4]}:${match[5]}:${match[6]}`;
-}
-
-function summarize(stations, payloadUpdatedAt, isSnapshot) {
+function summarize(stations, payloadUpdatedAt, isSnapshot, freshness) {
   const zeroByDistrict = new Map();
   let totalDocks = 0;
   let availableBikes = 0;
@@ -76,22 +74,41 @@ function summarize(stations, payloadUpdatedAt, isSnapshot) {
     zeroBikeStations,
     allZeroDistricts: rankedZeroDistricts,
     topZeroDistricts: rankedZeroDistricts.slice(0, 5),
-    updatedAt: parseOfficialTime(payloadUpdatedAt || stations[0]?.updatedAt),
+    updatedAt: formatSourceStamp(payloadUpdatedAt || stations[0]?.updatedAt),
     isSnapshot,
+    freshness: freshness || null,
   };
 }
 
 export async function loadYouBikeDashboard() {
+  /* 三種來源，依序嘗試：
+       1. VITE_YOUBIKE_API_URL   明確指定時優先（例如直接打官方即時 API）
+       2. /live/youbike_stations.json  每小時排程更新的那一份
+       3. 靜態快照                     全新部署、排程還沒跑過時的退路 */
   const configuredApi = String(import.meta.env.VITE_YOUBIKE_API_URL || "").trim();
+
+  if (!configuredApi) {
+    const live = await loadLiveRecords("youbike_stations");
+    if (live) {
+      const stations = live.rows.map(normalizeStation);
+      return summarize(stations, "", false, describeFreshness(live));
+    }
+  }
+
   const sourceUrl = configuredApi || new URL(DATA_FILES.youbikeSnapshot, document.baseURI).href;
   const response = await fetch(sourceUrl, { cache: configuredApi ? "no-store" : "default" });
   if (!response.ok) throw new Error(`YouBike 資料讀取失敗（HTTP ${response.status}）`);
 
   const payload = await response.json();
-  const rows = Array.isArray(payload) ? payload : payload.stations;
+  const rows = Array.isArray(payload) ? payload : payload.stations || payload.rows;
   if (!Array.isArray(rows) || !rows.length) throw new Error("YouBike 資料沒有可用站點");
   const stations = rows.map(normalizeStation);
-  return summarize(stations, Array.isArray(payload) ? "" : payload.updatedAt, !configuredApi);
+  return summarize(
+    stations,
+    Array.isArray(payload) ? "" : payload.updatedAt,
+    !configuredApi,
+    describeFreshness(null, configuredApi ? "即時" : "隨版本更新"),
+  );
 }
 
 /* ===== [Jerry 新增：YouBike 公共資源統計結束] ===== */

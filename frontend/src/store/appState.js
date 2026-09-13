@@ -81,6 +81,9 @@ export const appState = reactive({
       /* [本次新增：點開卡片會跳出跟死因統計一樣的 modal，footer 用這行公式說明] */
       formula: "稀缺率＝機構缺口（公立＋私立）÷ 應有機構總數 × 100",
       rows: [],
+      /* [2026-09-13 新增：資料時點與更新頻率。先宣告 key，reactive() 才追蹤得到
+         後續的賦值 —— Proxy 只攔既有屬性的寫入。] */
+      freshness: null,
     },
     /* [本次新增：交通稀缺率＝(需求標準化分數－供給標準化分數)／需求標準化分數×100，
        需求＝20~29歲青年人口、供給＝30分鐘平均可達站數，見 loadTransitGapData /
@@ -92,6 +95,8 @@ export const appState = reactive({
       copy: "各行政區交通稀缺率（需求標準化分數與供給標準化分數的落差；需求為20~29歲人口，供給為30分鐘平均可達站數）",
       formula: "稀缺率＝(需求標準化分數－供給標準化分數) ÷ 需求標準化分數 × 100",
       rows: [],
+      /* 交通稀缺率的來源是靜態路網 CSV，沒有排程更新，所以固定是 null。 */
+      freshness: null,
     },
   },
   transitLoaded: false,
@@ -196,6 +201,7 @@ export const appState = reactive({
         label: category.label,
         unit: category.unit,
         metricLabel: category.metricLabel,
+        freshness: category.freshness,
         copy: category.copy,
         formula: category.formula,
         rows: sorted.slice(0, 5).map(mapRow),
@@ -300,8 +306,10 @@ export const appState = reactive({
     this.childcareGapLoading = true;
     this.childcareGapStatus = "讀取托嬰機構與青年人口資料…";
     try {
-      const rows = await estimateChildcareGapRows();
-      this.resourceGaps.childcare.rows = rows;
+      const result = await estimateChildcareGapRows();
+      this.resourceGaps.childcare.rows = result.rows;
+      /* 資料時點與更新頻率一起帶進來，卡片才能標出「每月更新，資料時間 X」。 */
+      this.resourceGaps.childcare.freshness = result.freshness;
       this.childcareGapLoaded = true;
       this.childcareGapStatus = "";
     } catch (error) {

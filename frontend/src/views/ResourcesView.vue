@@ -61,6 +61,9 @@ const youbikeData = ref({
   topZeroDistricts: [],
   updatedAt: "",
   isSnapshot: true,
+  /* 更新頻率與資料時點，由 lib/youbike.js 的 describeFreshness 帶進來。
+     先宣告 key，載入前的第一次渲染才不會存取 undefined。 */
+  freshness: null,
 });
 
 const youbikeStats = computed(function () {
@@ -173,6 +176,13 @@ onBeforeUnmount(function () {
               <div class="resource-chart-title">
                 <h2>{{ chart.label }}{{ chart.metricLabel }}</h2>
                 <p :id="'chart-desc-' + chart.key">{{ chart.copy }}</p>
+                <!-- [2026-09-13 新增：更新頻率與資料時點。
+                     只有真的走排程更新的資料才有 freshness；靜態路網那類是 null，
+                     這一行就不出現，不會誤導使用者以為它也會自動更新。 -->
+                <p v-if="chart.freshness && chart.freshness.isLive" class="resource-chart-freshness">
+                  <span class="resource-chart-freshness-badge">{{ chart.freshness.refreshLabel }}</span>
+                  <span v-if="chart.freshness.fetchedAt">資料時間 {{ chart.freshness.fetchedAt }}</span>
+                </p>
               </div>
               <ul v-if="chart.rows[0] && chart.rows[0].segments" class="resource-chart-legend">
                 <li v-for="segment in chart.rows[0].segments" :key="segment.key" :class="'is-' + segment.key">
@@ -255,9 +265,20 @@ onBeforeUnmount(function () {
             <div>
               <h2 id="youbike-board-title">新北公共自行車調度概況</h2>
             </div>
+            <!-- [2026-09-13 改版：頻率改由資料本身帶進來（見 lib/data/liveRecords.js）。
+                 原本寫死「官方資料快照／即時資料」二選一，但現在有三種來源：
+                 每小時排程更新、直接打官方 API、以及還沒跑過排程時的靜態快照。 -->
             <p class="youbike-data-time">
-              {{ youbikeLoading ? "資料讀取中…" : (youbikeData.isSnapshot ? "官方資料快照" : "即時資料") }}
-              <span v-if="!youbikeLoading && youbikeData.updatedAt">{{ youbikeData.updatedAt }}</span>
+              <template v-if="youbikeLoading">資料讀取中…</template>
+              <template v-else>
+                <span v-if="youbikeData.freshness" class="youbike-freshness-badge">
+                  {{ youbikeData.freshness.refreshLabel }}
+                </span>
+                <span v-if="youbikeData.freshness && youbikeData.freshness.fetchedAt">
+                  取得於 {{ youbikeData.freshness.fetchedAt }}
+                </span>
+                <span v-if="youbikeData.updatedAt">來源時間 {{ youbikeData.updatedAt }}</span>
+              </template>
             </p>
           </header>
 

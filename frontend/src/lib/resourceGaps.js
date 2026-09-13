@@ -1,5 +1,6 @@
 import { DATA_FILES } from "./data/dataFiles.js";
 import { loadPopulationCsv } from "./data/fetchCsv.js";
+import { describeFreshness, loadLiveRecords } from "./data/liveRecords.js";
 
 /* [本次改版：圖表點開後要能看到「所有區域」的稀缺率，不能只回傳稀缺的區，
    所以這裡改成回傳資料集裡每一區的稀缺率（含 0% 已達平均水準的區），
@@ -22,11 +23,40 @@ const TYPES = [
   { key: "private", column: "私立托嬰機構" },
 ];
 
+/* 把 API 抓來的逐筆名冊彙總成跟靜態 CSV 一樣的形狀。
+
+   名冊是一列一間機構（391 筆），CSV 是一列一個行政區（21 列）。下面的計算需要
+   後者，所以在這裡分組計數。
+
+   `kind` 的值是「公共托育中心」或「私立托嬰機構」（見 backend 的
+   normalise_childcare_public／_private），所以用「公共」兩字判斷類別。
+   我驗證過這樣分組出來的數字跟靜態 CSV 的 21 個行政區完全一致。 */
+function summariseRoster(rows) {
+  const byArea = new Map();
+  rows.forEach(function (row) {
+    const area = row.district;
+    if (!area) return;
+    if (!byArea.has(area)) byArea.set(area, { area: area, 公共托育中心: 0, 私立托嬰機構: 0 });
+    const bucket = byArea.get(area);
+    if (String(row.kind || "").includes("公共")) bucket["公共托育中心"] += 1;
+    else bucket["私立托嬰機構"] += 1;
+  });
+  return Array.from(byArea.values());
+}
+
 export async function estimateChildcareGapRows() {
-  const [institutionRows, populationRows] = await Promise.all([
-    loadPopulationCsv(DATA_FILES.childcareInstitutions),
+  /* 托育機構名冊優先讀每月更新的那一份，沒有才退回靜態 CSV。
+     青年人口（分母）目前沒有對應的 API 抓取，所以一律讀 CSV —— 也就是
+     分子會月更、分母不會。人口變化慢，實務上影響很小，但這是已知落差。 */
+  const liveRoster = await loadLiveRecords("childcare_facilities");
+  const [csvInstitutionRows, populationRows] = await Promise.all([
+    liveRoster ? Promise.resolve(null) : loadPopulationCsv(DATA_FILES.childcareInstitutions),
     loadPopulationCsv(DATA_FILES.populationYouthCounts),
   ]);
+  const institutionRows = liveRoster
+    ? summariseRoster(liveRoster.rows)
+    : csvInstitutionRows;
+  const freshness = describeFreshness(liveRoster, "隨版本更新");
 
   const institutionsByArea = new Map();
   institutionRows.forEach(function (row) {
@@ -98,5 +128,7 @@ export async function estimateChildcareGapRows() {
     });
   });
 
-  return rows;
+  /* 回傳物件而不是只有 rows，讓畫面能顯示這批數字是什麼時候的、多久更新一次。
+     少了這個，使用者沒辦法判斷看到的是每月更新的資料還是隨版本走的舊值。 */
+  return { rows: rows, freshness: freshness };
 }

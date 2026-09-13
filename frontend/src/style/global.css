@@ -794,6 +794,33 @@
 
     .resource-chart-title h2 { margin: 0; font-size: 1.1rem; letter-spacing: -.02em; }
     .resource-chart-title p { margin: 6px 0 20px; color: var(--ink-soft); font-size: .78rem; line-height: 1.6; }
+    /* [2026-09-13 新增：更新頻率標記。只有走排程更新的資料才會出現這一行，
+       靜態資料不顯示 —— 標一個假的頻率比不標更糟。] */
+    .resource-chart-freshness {
+      display: flex;
+      margin: -14px 0 16px;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: var(--ink-soft);
+      font-size: .72rem;
+      line-height: 1.4;
+    }
+    .resource-chart-freshness-badge,
+    .youbike-freshness-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(24,87,47,.1);
+      color: var(--forest);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    /* 選擇器要帶 .youbike-data-time：同層的 `.youbike-data-time span` 規則
+       比單一 class 更具體，不加這一層的話標記會被染回一般說明文字的灰色。 */
+    .youbike-data-time .youbike-freshness-badge {
+      justify-self: end;
+      color: var(--forest);
+    }
 
     .resource-chart-status {
       margin: -6px 0 14px;
@@ -1055,6 +1082,13 @@
 
     .resources-view .resource-chart-title h2 { color: #f4f7f5; }
     .resources-view .resource-chart-title p { color: #aebcb7; }
+    .resources-view .resource-chart-freshness { color: #aebcb7; }
+    .resources-view .resource-chart-freshness-badge,
+    .resources-view .youbike-freshness-badge {
+      background: rgba(135,203,183,.16);
+      color: var(--mint);
+    }
+    .resources-view .youbike-data-time .youbike-freshness-badge { color: var(--mint); }
 
     .resources-view .resource-chart-legend { color: #aebcb7; }
     .resources-view .resource-chart-legend li.is-public i { background: var(--forest-2); }
