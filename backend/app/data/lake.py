@@ -42,7 +42,8 @@ RECORD_TABLE_COLUMNS = {
     ),
     "vaccine_schedules": ("district", "vaccine_hours", "bcg_hours", "remark", "updated"),
     "youbike_stations": (
-        "district", "name", "station_id", "address", "docks", "lat", "lon",
+        "district", "name", "station_id", "address",
+        "docks", "available", "updated", "lat", "lon",
     ),
 }
 

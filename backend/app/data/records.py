@@ -113,7 +113,10 @@ TABLES: dict[str, RecordTable] = {
             "刻意不含可借車輛數：那是即時值，放進季度快照會變成看起來精確但過期"
             "好幾個月的數字。要即時資料需另外接高頻來源。"
         ),
-        columns=("district", "name", "station_id", "address", "docks", "lat", "lon"),
+        columns=(
+            "district", "name", "station_id", "address",
+            "docks", "available", "updated", "lat", "lon",
+        ),
         searchable=("name", "address"),
         athena_table="youbike_stations",
     ),
@@ -420,6 +423,14 @@ def freshness() -> list[dict]:
                 status="ok",
                 generated_at=payload.get("generated_at"),
                 row_count=payload.get("row_count"),
+                # 更新頻率由抓取時寫進檔案（見 fetch.py 的 REFRESH_LABELS），
+                # 這裡只是轉出去。不在這裡重新查 data_sources.yaml 是刻意的：
+                # 檔案裡的值代表「這份資料實際是用哪個頻率抓的」，而 yaml 是
+                # 「現在設定成什麼」。改了排程之後兩者會有一段時間不同，
+                # 而畫面上該顯示的是前者。
+                refresh_group=payload.get("refresh_group"),
+                cadence=payload.get("cadence"),
+                refresh_label=payload.get("refresh_label"),
             )
         except (json.JSONDecodeError, OSError) as error:
             entry.update(status="unreadable", error=str(error))

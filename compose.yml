@@ -29,6 +29,18 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    volumes:
+      # 每月／每小時更新寫進來的資料，掛成唯讀讓 nginx 直接當靜態檔服務
+      # （/live/ 位置，見 docker/nginx/default.conf）。
+      #
+      # 為什麼不讓前端改打 /api/records：那條路每次都要經過 FastAPI 與
+      # records 的驗證層，而且 MAX_LIMIT=50 —— YouBike 有 1606 站、托育 391 筆，
+      # 面板要算全域統計，分頁拿會變成幾十次請求。這裡要的就是「整份檔案」，
+      # 讓 nginx 服務靜態 JSON 是最直接也最便宜的做法。
+      #
+      # :ro 很重要：web 容器只需要讀。少了它，一個 nginx 的漏洞就能改寫
+      # AI 引用的資料。
+      - living-circle-data:/srv/live:ro
     logging:
       driver: json-file
       options:
@@ -109,7 +121,16 @@ services:
 
   # 資料更新用的一次性容器，不會被 `docker compose up` 啟動（有 profile）。
   # 執行：docker compose run --rm refresh
-  # 由 .github/workflows/refresh-data.yml 每月排程觸發。
+  #   REFRESH_GROUP=monthly  名冊類（托育、疫苗院所、接種時段）
+  #   REFRESH_GROUP=hourly   YouBike 可借車數
+  #   不設              全抓（後台「立即更新」按鈕與人工執行）
+  #
+  # 由兩個排程觸發：
+  #   .github/workflows/refresh-data.yml     每月 1 號 -> monthly
+  #   .github/workflows/refresh-youbike.yml  每小時    -> hourly
+  #
+  # 用同一個服務加參數而不是開兩個服務：兩者的環境變數、volume、關卡邏輯完全
+  # 相同，複製一份只會在改動時漏掉一邊。
   refresh:
     profiles: ["tools"]
     build:
@@ -127,6 +148,7 @@ services:
       S3_DATA_BUCKET: ${S3_DATA_BUCKET:-}
       S3_CURATED_PREFIX: ${S3_CURATED_PREFIX:-curated/}
       LAKE_SYNC_ON_REFRESH: ${LAKE_SYNC_ON_REFRESH:-true}
+      REFRESH_GROUP: ${REFRESH_GROUP:-}
     volumes:
       - living-circle-data:/data
     # 需要寫入，所以不能沿用 chat 的 read-only 掛載
@@ -136,7 +158,12 @@ services:
       - |
         set -e
         mkdir -p /data/records
-        python scripts/fetch_sources.py --out /data/records --max-shrink "$${FETCH_MAX_SHRINK}"
+        # 空的 REFRESH_GROUP 代表全抓，所以 --group 要整個省略而不是傳空字串
+        # （argparse 的 choices 會拒絕空字串）。
+        group_arg=""
+        if [ -n "$${REFRESH_GROUP}" ]; then group_arg="--group $${REFRESH_GROUP}"; fi
+        python scripts/fetch_sources.py --out /data/records \
+          --max-shrink "$${FETCH_MAX_SHRINK}" $${group_arg}
     restart: "no"
     logging:
       driver: json-file

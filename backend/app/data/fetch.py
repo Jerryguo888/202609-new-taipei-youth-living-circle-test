@@ -208,10 +208,15 @@ def normalise_vaccine_schedules(rows: list[dict]) -> list[dict]:
 
 
 def normalise_youbike(rows: list[dict]) -> list[dict]:
-    """只留季度會用到的靜態欄位。
+    """站點的靜態屬性，加上即時的可借車數。
 
-    刻意丟掉 sbi_quantity／bemp／mday：那些是即時值，放進季度快照會變成
-    一組看起來精確但其實過期好幾個月的數字，比沒有更糟。
+    `available` 與 `updated` 是即時值。原本刻意丟掉它們，因為當時只有每月一次的
+    抓取，存一個「上個月某一刻的可借車數」會變成看起來精確但其實毫無意義的數字。
+
+    現在 YouBike 改成每小時抓一次（.github/workflows/refresh-youbike.yml），
+    一小時內的誤差對「哪些站點沒車」這種判斷是可接受的，所以把它們留下來。
+    `updated` 是來源自己的時戳（mday，格式 20260913T014500），跟我們的抓取時間
+    不同 —— 兩者都要保留，才分得出「我們多久沒抓」和「來源多久沒動」。
     """
     out = []
     for row in rows:
@@ -222,6 +227,8 @@ def normalise_youbike(rows: list[dict]) -> list[dict]:
                 "station_id": clean(row.get("sno")),
                 "address": clean(row.get("ar")),
                 "docks": to_int(row.get("tot_quantity")),
+                "available": to_int(row.get("sbi_quantity")),
+                "updated": clean(row.get("mday")),
                 "lat": to_float(row.get("lat")),
                 "lon": to_float(row.get("lng")),
             }
@@ -230,6 +237,14 @@ def normalise_youbike(rows: list[dict]) -> list[dict]:
 
 
 # dataset id -> (輸出的表名, 正規化函式)
+# 給人看的更新頻率描述。寫進輸出檔，前端直接顯示，不必自己維護一份對照表
+# —— 兩邊各寫一份的話，改了排程忘記改文案，畫面上就會標錯頻率。
+REFRESH_LABELS = {
+    "monthly": "每月更新",
+    "hourly": "每小時更新",
+}
+
+
 NORMALISERS = {
     "ntpc-childcare-public": ("childcare_facilities", normalise_childcare_public),
     "ntpc-childcare-private": ("childcare_facilities", normalise_childcare_private),
@@ -246,11 +261,15 @@ def fetch_all(
     out_dir: Path | None = None,
     only: list[str] | None = None,
     max_shrink: float | None = None,
+    group: str | None = None,
     log=print,
 ) -> dict:
     """抓取所有（或指定的）資料表並寫出。
 
     後台的「立即更新」和 CLI 都走這裡，所以行為完全一致。
+
+    `group` 對應 data_sources.yaml 的 refresh_group：`monthly` 是名冊類，
+    `hourly` 只有 YouBike。不指定就全抓（後台按鈕與手動執行用）。
 
     回傳 {"written": [表名], "problems": [說明], "counts": {表名: 筆數}}。
     """
@@ -260,6 +279,8 @@ def fetch_all(
 
     tables: dict[str, list[dict]] = {}
     problems: list[str] = []
+    # 每個表的更新頻率描述，寫進輸出檔讓前端不必自己維護一份對照表
+    table_cadence: dict[str, dict] = {}
 
     for entry in registry.datasets():
         dataset_id = entry.get("id")
@@ -269,6 +290,19 @@ def fetch_all(
         table, normalise = mapping
         if only and table not in only:
             continue
+        entry_group = entry.get("refresh_group") or "monthly"
+        if group and entry_group != group:
+            continue
+        # 同一張表可能由多個來源合併（托育 = 公共 + 私立），頻率取第一個就好，
+        # 因為同一張表的來源一定在同一個批次裡。
+        table_cadence.setdefault(
+            table,
+            {
+                "refresh_group": entry_group,
+                "cadence": entry.get("cadence"),
+                "refresh_label": REFRESH_LABELS.get(entry_group, entry_group),
+            },
+        )
 
         log(f"抓取 {dataset_id} -> {table}")
         try:
@@ -307,10 +341,16 @@ def fetch_all(
             log(f"  跳過 {table}：筆數異常下降 {previous} -> {len(records)}")
             continue
 
+        # 頻率資訊跟資料放在同一個檔案裡，前端讀這一份就同時拿到「資料多新」
+        # 與「多久更新一次」，不必另外呼叫端點、也不必自己維護對照表。
+        meta = table_cadence.get(table) or {}
         payload = {
             "table": table,
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "row_count": len(records),
+            "refresh_group": meta.get("refresh_group"),
+            "cadence": meta.get("cadence"),
+            "refresh_label": meta.get("refresh_label"),
             "rows": records,
         }
         # 先寫暫存檔再 rename：os.replace 在同一個檔案系統上是原子操作，
@@ -332,7 +372,10 @@ def fetch_all(
 
         log("推送到 S3 資料湖")
         try:
-            summary = lake.sync(log=log)
+            # 只推這次真的重寫過的表。每小時的 YouBike 批次不該順手把 725 列的
+            # population_youth 也重傳一次 —— 那張表來自指標快照，抓取不會改動它。
+            # 指標表由 scripts/sync_lake.py（不帶 --only）在部署時整批推。
+            summary = lake.sync(only=written, log=log)
             problems.extend(summary["skipped"])
         except Exception as error:  # noqa: BLE001
             # 上傳失敗不該讓整個更新算失敗：本機檔案已經寫好，網站照樣是新資料，

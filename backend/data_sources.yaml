@@ -29,10 +29,19 @@
 
 version: 1
 
-# 我們多久去打一次 API（.github/workflows/refresh-data.yml 的排程）。
-# 這跟下面每個資料集的 cadence 是兩件事：cadence 描述「來源自己多久變一次」，
-# 這裡描述「我們多久去看一次」。每月輪詢一個季更新的來源不會壞，只是多數月份
-# 抓到的內容跟上次一樣。
+# 我們多久去打一次 API。這跟每個資料集的 cadence 是兩件事：
+#   cadence        來源自己多久變一次（yearly / quarterly / realtime）
+#   refresh_group  我們把它排在哪一個抓取批次
+#
+# 分兩個批次是因為兩種資料的性質差太多：
+#   monthly  名冊類（機構、院所、時段）。每月輪詢一個季更新的來源不會壞，
+#            只是多數月份抓到的內容跟上次一樣。
+#   hourly   YouBike 的可借車數。這種值幾分鐘就變，每月抓一次等於沒有意義；
+#            但也不需要真的即時 —— 「哪些站點沒車」這種判斷容許一小時誤差。
+#
+# 對應的排程：
+#   monthly -> .github/workflows/refresh-data.yml     每月 1 號
+#   hourly  -> .github/workflows/refresh-youbike.yml  每小時
 poll_schedule: monthly
 
 # 季度批次的基準日；驗證關卡會比對 snapshot 是否推進
@@ -45,6 +54,7 @@ datasets:
     url: https://data.ntpc.gov.tw/api/datasets/8308ab58-62d1-424e-8314-24b65b7ab492/json?page=0&size=10000
     portal_page: https://data.ntpc.gov.tw/datasets/8308AB58-62D1-424E-8314-24B65B7AB492
     cadence: yearly
+    refresh_group: monthly
     destination: [athena]
     athena_table: population_age
     # ⚠ 這份資料的欄位名是 field1 + percent2~percent33，完全看不出對應哪個年齡層。
@@ -64,6 +74,7 @@ datasets:
     fetch: api
     url: https://data.ntpc.gov.tw/api/datasets/b3faf2aa-e96b-4f2f-b647-da47dc094860/json?page=0&size=10000
     cadence: quarterly
+    refresh_group: monthly
     destination: [athena]
     athena_table: childcare_facilities
     fields: [no, name, unit, county, town, address, localcallservice]
@@ -73,6 +84,7 @@ datasets:
     fetch: api
     url: https://data.ntpc.gov.tw/api/datasets/69cecdb0-7796-48df-84e5-99e4f1274245/json?page=0&size=10000
     cadence: quarterly
+    refresh_group: monthly
     destination: [athena]
     athena_table: childcare_facilities
     # person 是核定收托人數，是唯一帶容額的來源，缺口計算會用到
@@ -83,6 +95,7 @@ datasets:
     fetch: api
     url: https://data.ntpc.gov.tw/api/datasets/551cd3f4-534a-45cf-976a-359090fb7df6/json?page=0&size=10000
     cadence: quarterly
+    refresh_group: monthly
     destination: [athena]
     athena_table: vaccine_clinics
     fields: [name, "telephone number", address, type, remark, reservation, own_expense]
@@ -92,6 +105,7 @@ datasets:
     fetch: api
     url: https://data.ntpc.gov.tw/api/datasets/781ed216-be0d-4a31-a3e3-bc8f6fe2b221/json?page=0&size=10000
     cadence: quarterly
+    refresh_group: monthly
     destination: [athena]
     athena_table: vaccine_schedules
     # 內容是文字時段描述（「週一至週五上午8:30~11:30」），做不了數值彙總，
@@ -107,6 +121,7 @@ datasets:
     #   靜態（站點位置、總柱數 tot_quantity）走季度 → athena
     #   即時（sbi_quantity、bemp）如果要用，另開高頻排程，不要混進季度快照
     cadence: realtime
+    refresh_group: hourly
     quarterly_subset: [sno, sna, sarea, ar, lat, lng, tot_quantity]
     destination: [athena]
     athena_table: youbike_stations
@@ -119,6 +134,7 @@ datasets:
     url: https://data.gov.tw/dataset/123449
     portal: data.gov.tw
     cadence: quarterly
+    refresh_group: monthly
     destination: [athena]
     athena_table: parent_child_centers
     adapter: datagovtw
@@ -131,6 +147,7 @@ datasets:
     fetch: manual
     url: https://oas.bas.ntpc.gov.tw/DgbasWeb/Page/statfile4.aspx?Period=%u91ab%u7642%u9662%u6240%2c%u9810%u9632%u63a5%u7a2e%2c%u8b77%u58eb%2c%u5e8a%u4f4d
     cadence: quarterly
+    refresh_group: monthly
     destination: [kb]
     kb_prefix: kb/docs/vaccination-stats/
     manual_steps: >
@@ -143,6 +160,7 @@ datasets:
     fetch: manual
     url: https://oas.bas.ntpc.gov.tw/DgbasWeb/Page/statfile4.aspx?Period=%u91ab%u7642%u9662%u6240%2c%u9810%u9632%u63a5%u7a2e%2c%u8b77%u58eb%2c%u5e8a%u4f4d
     cadence: quarterly
+    refresh_group: monthly
     destination: [kb]
     kb_prefix: kb/docs/vaccination-stats/
     manual_steps: 同 ntpc-vaccination-counts，兩份一起匯出上傳。
@@ -151,6 +169,7 @@ datasets:
     name: 新北市死因統計（97-114）
     fetch: manual
     cadence: yearly
+    refresh_group: monthly
     destination: [athena]
     athena_table: mortality_statistics
     notes: >

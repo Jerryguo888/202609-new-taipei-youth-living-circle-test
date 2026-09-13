@@ -1,0 +1,78 @@
+name: Refresh YouBike
+
+# YouBike 的可借車數幾分鐘就變，每月抓一次等於沒有意義，所以跟名冊類分開排程。
+# 選每小時而不是更頻繁：畫面上要回答的是「哪些站點沒車」這種判斷，一小時的
+# 誤差可以接受，而每小時 24 次／天對上游和 runner 都很輕。
+#
+# 跟 refresh-data.yml（每月、名冊類）刻意分成兩個檔案而不是一個帶條件的
+# workflow：兩者的失敗處理不同 —— 名冊抓失敗要吵，YouBike 少一小時不要吵。
+on:
+  schedule:
+    # 每小時的第 5 分鐘。避開整點是因為整點是 GitHub Actions 的尖峰，
+    # 排程常常延遲好幾分鐘。
+    - cron: "5 * * * *"
+  workflow_dispatch:
+
+# 同一時間只跑一個。上一次還沒跑完就取消它 —— 舊的那次抓到的資料已經過時，
+# 沒有必要等它寫完再覆蓋。
+concurrency:
+  group: refresh-youbike
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DEPLOY_DIR: /home/ubuntu/202609-new-taipei-youth-living-circle-test
+
+jobs:
+  refresh:
+    runs-on: [self-hosted, main]
+    timeout-minutes: 10
+    env:
+      REFRESH_GROUP: hourly
+      # YouBike 站點數很穩定（約 1606），突然掉一半一定是上游出問題，
+      # 這時保留舊檔比覆蓋成壞資料好。比名冊類更嚴格：0.3 而不是 0.5。
+      FETCH_MAX_SHRINK: "0.3"
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+      S3_DATA_BUCKET: ${{ vars.S3_DATA_BUCKET }}
+      S3_CURATED_PREFIX: ${{ vars.S3_CURATED_PREFIX || 'curated/' }}
+      LAKE_SYNC_ON_REFRESH: ${{ vars.LAKE_SYNC_ON_REFRESH || 'true' }}
+
+    steps:
+      - name: Fetch YouBike
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          docker compose run --rm refresh 2>&1 | tee /tmp/youbike.log
+
+      - name: Report what happened
+        # 每小時跑 24 次，所以刻意只在真的有問題時才發 warning ——
+        # 否則 Actions 的通知會被淹沒，真正的問題反而看不到。
+        run: |
+          set -euo pipefail
+          if grep -q "跳過 youbike_stations" /tmp/youbike.log; then
+            echo "::warning::YouBike fetch returned too few stations, so the previous data was kept. Check whether the upstream API changed."
+            grep "跳過 youbike_stations" /tmp/youbike.log >&2
+            exit 0
+          fi
+          if grep -q "S3 上傳失敗" /tmp/youbike.log; then
+            echo "::error::Local data was updated but the S3 upload failed, so Athena still holds the previous hour."
+            grep "S3 上傳失敗" /tmp/youbike.log >&2
+            exit 1
+          fi
+          # 正常路徑只印一行摘要，不發任何通知
+          grep -E "^寫出|^  上傳 s3://" /tmp/youbike.log | sed 's/^/  /' || true
+
+      - name: Confirm the running container sees it
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          addr="$(docker compose port web 8080)"
+          port="${addr##*:}"
+          body="$(curl --fail --silent --show-error --max-time 15 \
+            "http://127.0.0.1:${port}/api/meta/datasets")"
+          # 單行寫法：`run: |` 區塊裡的內容必須整段縮排，多行 python 從第 0 欄
+          # 開始會提前終止 YAML 的 block scalar。
+          printf '%s' "$body" | python3 -c 'import json,sys; rows=json.load(sys.stdin)["data_freshness"]; row=next((r for r in rows if r["table"]=="youbike_stations"), None); print("  youbike_stations:", row); sys.exit(0 if row and not row.get("bundled_fallback") and row.get("status")=="ok" else 1)' \
+            || { echo "::error::The container is still serving the image copy of youbike_stations, so the refresh did not reach the path the server reads from."; exit 1; }

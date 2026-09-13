@@ -37,6 +37,10 @@ jobs:
     timeout-minutes: 20
     env:
       FETCH_MAX_SHRINK: ${{ inputs.max_shrink || '0.5' }}
+      # 只抓名冊類。YouBike 由 refresh-youbike.yml 每小時單獨處理 ——
+      # 這裡不帶 monthly 的話，每月這一次會把 YouBike 也覆蓋成當下的值，
+      # 跟每小時那條排程互相干擾。
+      REFRESH_GROUP: monthly
       # 這幾個是給 compose 的 refresh 服務用的。少了 S3_DATA_BUCKET，抓取會
       # 正常完成、本機資料也會更新，但會跳過 S3 上傳 —— 結果是網站看到新數字、
       # Athena 還在回上個月的，而且兩邊都不會報錯。

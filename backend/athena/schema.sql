@@ -93,12 +93,18 @@ WITH SERDEPROPERTIES ('ignore.malformed.json' = 'true')
 LOCATION 's3://__BUCKET__/curated/vaccine_schedules/';
 
 DROP TABLE IF EXISTS ntpc_youth.youbike_stations;
+-- available/updated 是每小時抓一次的即時值（其他表是每月）。
+-- updated 是來源自己的時戳，格式 20260913T014500，宣告成 string 而不是
+-- timestamp —— Athena 的 timestamp 只吃 'YYYY-MM-DD HH:MM:SS'，餵它這種
+-- 格式整欄會變 NULL。要當時間用就在查詢時 parse。
 CREATE EXTERNAL TABLE ntpc_youth.youbike_stations (
   district    string,
   name        string,
   station_id  string,
   address     string,
   docks       int,
+  available   int,
+  updated     string,
   lat         double,
   lon         double
 )

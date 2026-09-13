@@ -30,6 +30,14 @@ def main() -> int:
     )
     parser.add_argument("--only", action="append", help="只抓某個輸出表名，可重複")
     parser.add_argument(
+        "--group",
+        choices=["monthly", "hourly"],
+        help=(
+            "只抓 data_sources.yaml 裡 refresh_group 相符的來源。"
+            "monthly=名冊類，hourly=YouBike 即時車數。省略則全抓。"
+        ),
+    )
+    parser.add_argument(
         "--max-shrink",
         type=float,
         default=config.FETCH_MAX_SHRINK,
@@ -46,6 +54,7 @@ def main() -> int:
         summary = fetch.fetch_all(
             out_dir=Path(args.out),
             only=args.only,
+            group=args.group,
             max_shrink=args.max_shrink,
         )
     except fetch.FetchError as error:
